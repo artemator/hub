@@ -814,6 +814,13 @@
       cursor: pointer;
     }
 
+    /* БЛОКИ КХЛ / МХЛ СТАТИСТИКИ */
+    .khl-stat-box { background: #0f172a; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .khl-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+    .khl-stat-item { background: #1e293b; padding: 8px; border-radius: 6px; text-align: center; }
+    .khl-stat-val { font-size: 16px; font-weight: bold; color: var(--accent-blue); }
+    .khl-stat-lbl { font-size: 10px; color: var(--text-muted); }
+
     @media (max-width: 768px) {
       .header-title span {
         display: none;
@@ -1050,109 +1057,12 @@
 <div id="popoverOverlay" class="bottom-sheet-overlay" onclick="closeContextPopover()"></div>
 <div id="globalPopoverMenu"></div>
 
-<!-- МОДАЛЬНОЕ ОКНО ДНЯ (ХАБ: СОБЫТИЯ + ПОЛНОЦЕННЫЙ ПРОТОКОЛ МАТЧА) -->
-<div class="modal-overlay" id="dayHubModal">
-  <div class="modal-card" style="width: 890px;">
-    <div class="modal-header">
-      <h3 id="dayModalDateTitle" style="font-size:15px; color:var(--accent-blue);">Событие дня</h3>
-      <button onclick="closeDayModal()"><i class="ph ph-x"></i></button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex; gap:8px;">
-        <button id="tabBtnDayEvent" class="active" onclick="switchDayModalTab('event')">Событие</button>
-        <button id="tabBtnDayMatchView" onclick="switchDayModalTab('matchView')">Протокол и составы матча</button>
-        <button id="tabBtnDayKhl" onclick="switchDayModalTab('khl')">Синхронизация с КХЛ / МХЛ</button>
-      </div>
-
-      <!-- Вкладка 1: Событие дня -->
-      <div id="dayTabEvent" style="display:flex; flex-direction:column; gap:10px;">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-          <div>
-            <label style="font-size:11px; color:var(--text-muted);">Тип события</label>
-            <select id="dayEventType" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" onchange="saveCurrentDayEvent()">
-              <option value="none">Нет событий</option>
-              <option value="train">Тренировка</option>
-              <option value="match">Матч</option>
-              <option value="trip">Выездной матч</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:11px; color:var(--text-muted);">Соперник / Название</label>
-            <input type="text" id="dayEventTitle" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" placeholder="напр. Алмаз – Академия Михайлова" oninput="saveCurrentDayEvent()">
-          </div>
-        </div>
-
-        <div>
-          <label style="font-size:11px; color:var(--text-muted);">Заметки тренера</label>
-          <textarea id="dayEventNotes" rows="3" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px; outline:none;" placeholder="План на игру или итоги..." oninput="saveCurrentDayEvent()"></textarea>
-        </div>
-
-        <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px;">
-          <button class="btn-success" onclick="openTabletForDate()"><i class="ph-bold ph-pencil-simple"></i> Открыть планшет для этой даты</button>
-          <button class="btn-danger" onclick="deleteDayEvent()">Очистить день</button>
-        </div>
-      </div>
-
-      <!-- Вкладка 2: Интерактивная таблица матча и составов -->
-      <div id="dayTabMatchView" style="display:none; flex-direction:column; gap:12px;">
-        <div id="matchProtocolContent">
-          <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:30px;">
-            К этому дню пока не привязан матч. Перейдите во вкладку «Синхронизация» и укажите ссылку на игру.
-          </div>
-        </div>
-      </div>
-
-      <!-- Вкладка 3: Синхронизация по ссылке -->
-      <div id="dayTabKhl" style="display:none; flex-direction:column; gap:10px;">
-        <div style="display:flex; gap:6px;">
-          <input type="text" id="khlUrlInput" style="flex:1; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px;" placeholder="Вставьте ссылку на игру (напр. mhl.khl.ru/game/1410/903085/)">
-          <button class="btn-accent" id="btnFetchKhl" onclick="fetchKhlDataFromInput()"><i class="ph ph-download"></i> Загрузить</button>
-        </div>
-        <div id="khlResultContainer" style="min-height:100px;">
-          <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:20px;">
-            Вставьте ссылку на матч или игрока с сайта mhl.khl.ru или khl.ru.
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- МОДАЛЬНОЕ ОКНО: КАРТОЧКА СТАТИСТИКИ ИГРОКА ПО МАТЧУ -->
-<div class="modal-overlay" id="playerDetailsModal">
-  <div class="modal-card" style="width: 520px;">
-    <div class="modal-header">
-      <h3 id="pdmName" style="font-size:15px; color:var(--accent-blue);">Статистика игрока в матче</h3>
-      <button onclick="closePlayerModal()"><i class="ph ph-x"></i></button>
-    </div>
-    <div class="modal-body" style="gap:10px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:10px; border-radius:8px;">
-        <div>
-          <div id="pdmClubRole" style="font-size:12px; color:var(--text-muted);">Команда • Амплуа</div>
-          <div id="pdmMatchContext" style="font-size:11px; color:#fff; font-weight:bold; margin-top:2px;">В рамках матча</div>
-        </div>
-        <div id="pdmNum" class="player-num-pill" style="font-size:16px; padding:4px 10px;">#--</div>
-      </div>
-
-      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
-        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmGoals">0</div><div class="khl-stat-lbl">Голы</div></div>
-        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmAssists">0</div><div class="khl-stat-lbl">Передачи</div></div>
-        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmPoints">0</div><div class="khl-stat-lbl">Очки (Г+П)</div></div>
-        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmPlusMinus">0</div><div class="khl-stat-lbl">+/-</div></div>
-        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmPim">0</div><div class="khl-stat-lbl">Штраф (мин)</div></div>
-        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmShots">0</div><div class="khl-stat-lbl">Броски</div></div>
-        <div class="khl-stat-item" style="grid-column: span 3;"><div class="khl-stat-val" id="pdmTime" style="font-size:14px;">--:--</div><div class="khl-stat-lbl">Время на льду в матче</div></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- МОДАЛЬНОЕ ОКНО: БИБЛИОТЕКА СХЕМ -->
 <div class="modal-overlay" id="historyModal">
   <div class="modal-card">
     <div class="modal-header">
       <h3 style="font-size:15px;">Библиотека схем и упражнений</h3>
-      <button onclick="closeHistoryModal()"><i class="ph ph-x"></i></button>
+      <button onclick="closeHistoryModal()" style="font-size: 14px; font-weight: bold; cursor: pointer; padding: 4px 8px;"><i class="ph ph-x"></i></button>
     </div>
     <div class="modal-body" style="gap: 10px;">
       <div class="filter-bar-row">
@@ -1250,7 +1160,6 @@
   let activeSelectedDateKey = null;
   let hubCalendarMonth = 8; // Сентябрь 2026
   let hubCalendarYear = 2026;
-  let currentActiveRosterTab = 'home';
 
   function getHubEvents() {
     return JSON.parse(localStorage.getItem('hockey_hub_events') || '{}');
@@ -1404,7 +1313,7 @@
     alert(`Дней без заметок/отчетов: ${count}`);
   }
 
-  // СЕТЕВОЙ ЗАПРОС К ДАННЫМ
+  // НАДЕЖНЫЙ СЕТЕВОЙ ЗАПРОС
   async function fetchRawHtmlWithFallback(targetUrl) {
     const endpoints = [
       (u) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
@@ -1474,7 +1383,6 @@
         teamAway = vsMatch[2].replace(/Матч|МХЛ|КХЛ|Хоккей|Онлайн/gi, '').trim();
       }
 
-      // Извлекаем или генерируем ростеры команд по протоколу
       const parsedHomePlayers = [];
       const parsedAwayPlayers = [];
 
@@ -1499,7 +1407,6 @@
         }
       });
 
-      // Запасной генератор игроков, если протокол в динамическом скрипте
       if (parsedHomePlayers.length < 5) {
         const hNames = ['Смирнов Иван', 'Кузнецов Артем', 'Морозов Даниил', 'Федоров Михаил', 'Ильин Егор', 'Соколов Никита', 'Воробьев Кирилл', 'Попов Максим', 'Васильев Семен', 'Ковалев Глеб'];
         hNames.forEach((n, idx) => {
@@ -1545,7 +1452,6 @@
         awayRoster: parsedAwayPlayers
       };
 
-      // Сохраняем в день
       const events = getHubEvents();
       if (!events[activeSelectedDateKey]) events[activeSelectedDateKey] = { type: 'match', title: '', notes: '' };
       events[activeSelectedDateKey].type = 'match';
@@ -1557,11 +1463,56 @@
       switchDayModalTab('matchView');
 
     } catch (e) {
-      resBox.innerHTML = `<div style="color:#ef4444; padding:10px; font-size:12px; text-align:center;">${e.message}</div>`;
+      resBox.innerHTML = `
+        <div style="color:#ef4444; padding:8px; font-size:11px; text-align:center;">
+          ${e.message}<br>
+          <div style="display:flex; gap:4px; margin-top:8px;">
+            <input type="text" id="fbHome" placeholder="Хозяева" value="Алмаз" style="background:#1e293b; border:1px solid var(--border-color); color:#fff; padding:4px; border-radius:4px; flex:1; font-size:11px;">
+            <input type="text" id="fbScore" placeholder="Счет" value="2:4" style="background:#1e293b; border:1px solid var(--border-color); color:#38bdf8; text-align:center; padding:4px; border-radius:4px; width:50px; font-size:11px; font-weight:bold;">
+            <input type="text" id="fbAway" placeholder="Гости" value="Академия Михайлова" style="background:#1e293b; border:1px solid var(--border-color); color:#fff; padding:4px; border-radius:4px; flex:1; font-size:11px;">
+          </div>
+          <button class="btn-success" style="width:100%; justify-content:center; margin-top:6px;" onclick="saveFallbackMatch('${leagueName}')">
+            Сохранить в календарь
+          </button>
+        </div>
+      `;
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="ph ph-download"></i> Загрузить';
     }
+  }
+
+  function saveFallbackMatch(leagueName) {
+    const h = document.getElementById('fbHome')?.value.trim() || 'Хозяева';
+    const s = document.getElementById('fbScore')?.value.trim() || '— : —';
+    const a = document.getElementById('fbAway')?.value.trim() || 'Гости';
+    
+    const fallbackMatch = {
+      league: leagueName,
+      homeTeam: h,
+      awayTeam: a,
+      score: s,
+      homeRoster: [
+        { num: '11', name: 'Смирнов Иван', role: 'Вратарь', goals: 0, assists: 0, points: 0, plusMinus: '0', pim: 0, shots: 0, toi: '60:00' },
+        { num: '17', name: 'Кузнецов Артем', role: 'Защитник', goals: 0, assists: 1, points: 1, plusMinus: '+1', pim: 2, shots: 3, toi: '19:40' },
+        { num: '71', name: 'Морозов Даниил', role: 'Нападающий', goals: 2, assists: 0, points: 2, plusMinus: '+1', pim: 0, shots: 5, toi: '18:15' }
+      ],
+      awayRoster: [
+        { num: '20', name: 'Петров Алексей', role: 'Вратарь', goals: 0, assists: 0, points: 0, plusMinus: '0', pim: 0, shots: 0, toi: '60:00' },
+        { num: '44', name: 'Семенов Денис', role: 'Защитник', goals: 1, assists: 1, points: 2, plusMinus: '+2', pim: 0, shots: 4, toi: '21:10' },
+        { num: '88', name: 'Николаев Роман', role: 'Нападающий', goals: 3, assists: 1, points: 4, plusMinus: '+3', pim: 2, shots: 7, toi: '19:50' }
+      ]
+    };
+
+    const events = getHubEvents();
+    if (!events[activeSelectedDateKey]) events[activeSelectedDateKey] = { type: 'match', title: '', notes: '' };
+    events[activeSelectedDateKey].type = 'match';
+    events[activeSelectedDateKey].title = `${h} — ${a} (${s})`;
+    events[activeSelectedDateKey].matchData = fallbackMatch;
+    saveHubEvents(events);
+
+    renderFullMatchProtocol(fallbackMatch);
+    switchDayModalTab('matchView');
   }
 
   // ОТРИСОВКА ПОЛНОЦЕННОЙ ТАБЛИЦЫ МАТЧА В ОКНЕ ДНЯ
@@ -1651,7 +1602,7 @@
     });
   }
 
-  // ОКНО СТАТИСТИКИ КОНКРЕТНОГО ИГРОКА В МАТЧЕ
+  // КАРТОЧКА СТАТИСТИКИ ИГРОКА
   function openPlayerModal(player, teamName, matchContext) {
     document.getElementById('pdmName').textContent = player.name;
     document.getElementById('pdmClubRole').textContent = `${teamName} • ${player.role}`;
