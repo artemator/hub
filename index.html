@@ -743,7 +743,7 @@
       cursor: pointer;
     }
 
-    /* БЛОКИ КХЛ СТАТИСТИКИ */
+    /* БЛОКИ КХЛ / МХЛ СТАТИСТИКИ */
     .khl-stat-box { background: #0f172a; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
     .khl-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
     .khl-stat-item { background: #1e293b; padding: 8px; border-radius: 6px; text-align: center; }
@@ -995,7 +995,7 @@
 <div id="popoverOverlay" class="bottom-sheet-overlay" onclick="closeContextPopover()"></div>
 <div id="globalPopoverMenu"></div>
 
-<!-- МОДАЛЬНОЕ ОКНО ДНЯ (ХАБ: СОБЫТИЯ + КХЛ) -->
+<!-- МОДАЛЬНОЕ ОКНО ДНЯ (ХАБ: СОБЫТИЯ + КХЛ/МХЛ) -->
 <div class="modal-overlay" id="dayHubModal">
   <div class="modal-card">
     <div class="modal-header">
@@ -1005,7 +1005,7 @@
     <div class="modal-body">
       <div style="display:flex; gap:8px;">
         <button id="tabBtnDayEvent" class="active" onclick="switchDayModalTab('event')">Событие</button>
-        <button id="tabBtnDayKhl" onclick="switchDayModalTab('khl')">Синхронизация с КХЛ</button>
+        <button id="tabBtnDayKhl" onclick="switchDayModalTab('khl')">Синхронизация с КХЛ / МХЛ</button>
       </div>
 
       <!-- Вкладка События -->
@@ -1022,7 +1022,7 @@
           </div>
           <div>
             <label style="font-size:11px; color:var(--text-muted);">Соперник / Название</label>
-            <input type="text" id="dayEventTitle" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" placeholder="напр. СКА или Тренировка звеньев" oninput="saveCurrentDayEvent()">
+            <input type="text" id="dayEventTitle" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" placeholder="напр. СКА-1946 или Тренировка звеньев" oninput="saveCurrentDayEvent()">
           </div>
         </div>
 
@@ -1037,14 +1037,14 @@
         </div>
       </div>
 
-      <!-- Вкладка КХЛ -->
+      <!-- Вкладка КХЛ / МХЛ -->
       <div id="dayTabKhl" style="display:none; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:6px;">
-          <input type="text" id="khlUrlInput" style="flex:1; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px;" placeholder="Вставьте ссылку на игрока или матч (https://www.khl.ru/...)">
+          <input type="text" id="khlUrlInput" style="flex:1; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px;" placeholder="Ссылка на игрока или матч (khl.ru или mhl.khl.ru)">
           <button class="btn-accent" id="btnFetchKhl" onclick="fetchKhlDataFromInput()"><i class="ph ph-download"></i> Загрузить</button>
         </div>
         <div id="khlResultContainer" style="min-height:100px;">
-          <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:20px;">Вставьте ссылку на профиль игрока или протокол игры с сайта КХЛ.</div>
+          <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:20px;">Вставьте ссылку на профиль игрока или протокол игры с сайта khl.ru или mhl.khl.ru.</div>
         </div>
       </div>
     </div>
@@ -1299,10 +1299,11 @@
     alert(`Дней без заметок/отчетов: ${count}`);
   }
 
+  // УНИВЕРСАЛЬНЫЙ ПАРСЕР КХЛ И МХЛ
   async function fetchKhlDataFromInput() {
-    const url = document.getElementById('khlUrlInput').value.trim();
-    if (!url) {
-      alert('Вставьте ссылку с сайта khl.ru');
+    const rawUrl = document.getElementById('khlUrlInput').value.trim();
+    if (!rawUrl || (!rawUrl.includes('khl.ru') && !rawUrl.includes('mhl.'))) {
+      alert('Пожалуйста, вставьте корректную ссылку с сайта khl.ru или mhl.khl.ru');
       return;
     }
 
@@ -1310,51 +1311,96 @@
     btn.disabled = true;
     btn.innerHTML = '<i class="ph ph-spinner"></i> Загрузка...';
 
+    const isMhl = rawUrl.includes('mhl.');
+    const leagueName = isMhl ? 'МХЛ' : 'КХЛ';
+
     const resBox = document.getElementById('khlResultContainer');
-    resBox.innerHTML = '<div style="text-align:center; padding:15px;">Связываемся с базой КХЛ...</div>';
+    resBox.innerHTML = `<div style="text-align:center; padding:15px;">Связываемся с базой ${leagueName}...</div>`;
 
     try {
-      const proxy = 'https://api.allorigins.win/get?url=';
-      const response = await fetch(proxy + encodeURIComponent(url));
+      const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(rawUrl);
+      const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error('Сетевой сбой при ответе шлюза');
+
       const resData = await response.json();
       const html = resData.contents;
 
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
-      const name = doc.querySelector('.b-character_descr .b-character_name')?.textContent?.trim() || 
-                   doc.querySelector('.player-cover__name')?.textContent?.trim() || 
-                   doc.querySelector('h1')?.textContent?.trim() || 'Хоккеист КХЛ';
+      const isGame = rawUrl.includes('/game/');
 
-      resBox.innerHTML = `
-        <div class="khl-stat-box">
-          <div style="font-weight:bold; font-size:14px; color:var(--accent-blue);">${name}</div>
-          <div class="khl-stat-grid">
-            <div class="khl-stat-item"><div class="khl-stat-val">Игры</div><div class="khl-stat-lbl">Синхронизировано</div></div>
-            <div class="khl-stat-item"><div class="khl-stat-val">КХЛ</div><div class="khl-stat-lbl">Официальная база</div></div>
+      if (isGame) {
+        const teamHome = doc.querySelector('.b-match_data_teams .b-team__name_home, .match-info__team-name_left, .b-match_data_left .b-team_name, .b-match_data_teams .home .b-team_name')?.textContent?.trim() || 'Хозяева';
+        const teamAway = doc.querySelector('.b-match_data_teams .b-team__name_away, .match-info__team-name_right, .b-match_data_right .b-team_name, .b-match_data_teams .away .b-team_name')?.textContent?.trim() || 'Гости';
+        
+        let score = doc.querySelector('.b-match_data .b-match_score, .match-info__score, .b-match_data_score')?.textContent?.trim().replace(/\s+/g, ' ') || '';
+        if (!score || score.length < 3) {
+          const scoreParts = doc.querySelectorAll('.b-match_data_score .b-match_data_score-digit, .match-info__score-digit');
+          if (scoreParts.length >= 2) {
+            score = `${scoreParts[0].textContent.trim()} : ${scoreParts[1].textContent.trim()}`;
+          } else {
+            score = '— : —';
+          }
+        }
+
+        resBox.innerHTML = `
+          <div class="khl-stat-box">
+            <div style="font-weight:bold; font-size:13px; color:var(--accent-blue); display:flex; justify-content:space-between;">
+              <span>Матч ${leagueName}</span>
+              <span style="color:var(--text-muted); font-size:11px;">Протокол игры</span>
+            </div>
+            <div style="font-size:20px; font-weight:800; color:#fff; text-align:center; padding:8px 0; background:#1e293b; border-radius:6px; margin:4px 0;">
+              ${teamHome} <span style="color:var(--accent-blue);">${score}</span> ${teamAway}
+            </div>
+            <div class="khl-stat-grid">
+              <div class="khl-stat-item"><div class="khl-stat-val">${teamHome}</div><div class="khl-stat-lbl">Хозяева</div></div>
+              <div class="khl-stat-item"><div class="khl-stat-val">${teamAway}</div><div class="khl-stat-lbl">Гости</div></div>
+            </div>
+            <button class="btn-success" onclick="attachKhlToEvent('Матч ${leagueName}: ${teamHome} — ${teamAway} (${score})')"><i class="ph ph-check"></i> Привязать протокол к этому дню</button>
           </div>
-          <button class="btn-success" onclick="attachKhlToEvent('${name}')"><i class="ph ph-check"></i> Привязать к дню</button>
-        </div>
-      `;
+        `;
+      } else {
+        const name = doc.querySelector('.b-character_descr .b-character_name, .player-cover__name, .b-player-info__name, h1')?.textContent?.trim() || 'Хоккеист ' + leagueName;
+        const team = doc.querySelector('.player-cover__club, .b-character_descr .b-character_club, .b-player-info__club')?.textContent?.trim() || leagueName;
+        const role = doc.querySelector('.player-cover__role, .b-character_descr .b-character_role, .b-player-info__role')?.textContent?.trim() || 'Амплуа';
+
+        resBox.innerHTML = `
+          <div class="khl-stat-box">
+            <div style="font-weight:bold; font-size:14px; color:var(--accent-blue);">${name}</div>
+            <div style="font-size:11px; color:var(--text-muted);">${team} • ${role} • ${leagueName}</div>
+            <div class="khl-stat-grid">
+              <div class="khl-stat-item"><div class="khl-stat-val">${leagueName}</div><div class="khl-stat-lbl">Турнир</div></div>
+              <div class="khl-stat-item"><div class="khl-stat-val">OK</div><div class="khl-stat-lbl">Синхронизация</div></div>
+            </div>
+            <button class="btn-success" onclick="attachKhlToEvent('Игрок ${leagueName}: ${name} (${team})')"><i class="ph ph-check"></i> Привязать игрока к этому дню</button>
+          </div>
+        `;
+      }
     } catch (e) {
-      resBox.innerHTML = `<div style="color:#ef4444; padding:10px;">Ошибка загрузки ссылки: ${e.message}</div>`;
+      resBox.innerHTML = `<div style="color:#ef4444; padding:10px; font-size:12px;">Не удалось загрузить данные с ${leagueName}: ${e.message}. Проверьте корректность ссылки.</div>`;
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="ph ph-download"></i> Загрузить';
     }
   }
 
-  function attachKhlToEvent(name) {
+  function attachKhlToEvent(label) {
     if (!activeSelectedDateKey) return;
     const events = getHubEvents();
     if (!events[activeSelectedDateKey]) events[activeSelectedDateKey] = { type: 'match', title: '', notes: '' };
-    events[activeSelectedDateKey].notes = (events[activeSelectedDateKey].notes ? events[activeSelectedDateKey].notes + '\n' : '') + `[КХЛ: ${name}]`;
+    
+    events[activeSelectedDateKey].notes = (events[activeSelectedDateKey].notes ? events[activeSelectedDateKey].notes + '\n' : '') + `[${label}]`;
+    if (!events[activeSelectedDateKey].title) {
+      events[activeSelectedDateKey].title = label.split(':')[1]?.split('(')[0]?.trim() || label;
+    }
+    
     saveHubEvents(events);
-    alert('Статистика привязана к дню!');
+    alert('Сведения сохранены в карточке дня!');
     closeDayModal();
   }
 
-  // ТАКТИЧЕСКИЙ ПЛАНШЕТ 1.0
+  // ТАКТИЧЕСКИЙ ПЛАНШЕТ
   const VIRTUAL_WIDTH_FULL = 1100;
   const VIRTUAL_WIDTH_HALF = 550;
   const VIRTUAL_HEIGHT = 580;
@@ -3475,7 +3521,7 @@
     }
   }
 
-  // ЗАПУСК И ИНИЦИАЛИЗАЦИЯ
+  // ЗАПУСК
   window.addEventListener('DOMContentLoaded', () => {
     drawFullIce();
     setupCanvasEvents();
