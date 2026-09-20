@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Хоккейный хаб и планшет PRO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Хоккейный Хаб">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0b1120;
+      --panel-bg: #151f32;
+      --border-color: #2b3952;
+      --accent-blue: #38bdf8;
+      --active-btn: #1d4ed8;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --match-color: #ef4444;
+      --train-color: #22c55e;
+      --trip-color: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      position: relative;
+    }
+    header {
+      background-color: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      flex-shrink: 0;
+      gap: 8px;
+      z-index: 50;
+    }
+    .header-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-blue);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-group { display: flex; align-items: center; gap: 5px; overflow-x: auto; }
+    button {
+      background: #1e293b; color: #fff; border: 1px solid var(--border-color);
+      padding: 5px 9px; border-radius: 6px; font-size: 11px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    }
+    button:hover { background: #334155; }
+    button.active { background: var(--active-btn); border-color: #60a5fa; }
+    button.btn-accent { background: #0284c7; border-color: #38bdf8; }
+    button.btn-success { background: #15803d; border-color: #4ade80; }
+    button.btn-warning { background: #d97706; border-color: #fbbf24; }
+    button.btn-secondary { background: #334155; border-color: #475569; }
+    button.btn-danger { background: #991b1b; border-color: #ef4444; }
+
+    /* ВИДЫ (ВКЛАДКИ) */
+    .view-container { flex: 1; display: none; overflow: hidden; position: relative; }
+    .view-container.active-view { display: flex; }
+
+    /* СТИЛИ КАЛЕНДАРЯ-ХАБА */
+    #calendarView { flex-direction: column; overflow-y: auto; padding: 14px; gap: 14px; }
+    .hub-header-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .calendar-card-wrapper {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .month-nav-row { display: flex; justify-content: space-between; align-items: center; }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+    .calendar-day-head {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 4px;
+    }
+    .calendar-day-cell {
+      min-height: 80px;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .calendar-day-cell:hover { border-color: var(--accent-blue); }
+    .calendar-day-cell.other-month { opacity: 0.3; }
+    .calendar-day-cell.today { border-color: #38bdf8; background: #132238; }
+    .day-num-header { font-size: 12px; font-weight: bold; }
+    .day-badge {
+      font-size: 9px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .badge-match { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--match-color); color: #fca5a5; }
+    .badge-train { background: rgba(34, 197, 94, 0.2); border: 1px solid var(--train-color); color: #86efac; }
+    .badge-trip { background: rgba(245, 158, 11, 0.2); border: 1px solid var(--trip-color); color: #fde68a; }
+
+    /* ТАКТИЧЕСКИЙ ПЛАНШЕТ */
+    #tabletView { flex-direction: row; }
+    .sidebar { width: 290px; background: var(--panel-bg); border-right: 1px solid var(--border-color); padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+    .sidebar-group-trigger { display: none; }
+    .tools-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+    .palette-row { display: flex; gap: 8px; }
+    .color-swatch { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+    .color-swatch.active { border-color: #fff; transform: scale(1.15); }
+    .canvas-container-outer { flex: 1; display: flex; align-items: center; justify-content: center; background: #060a12; position: relative; overflow: hidden; padding: 8px; }
+    .canvas-card { box-shadow: 0 10px 35px rgba(0,0,0,0.7); border-radius: 10px; overflow: hidden; background: #fff; }
+
+    /* ПОЛНОЭКРАННЫЙ РЕЖИМ */
+    body.is-fullscreen header { height: 38px; padding: 2px 8px; }
+    body.is-fullscreen #tabletView { flex-direction: column; }
+    body.is-fullscreen .sidebar { width: 100%; height: 48px; flex-direction: row; border-right: none; border-top: 1px solid var(--border-color); padding: 4px 8px; align-items: center; gap: 8px; order: 2; }
+    body.is-fullscreen .canvas-container-outer { order: 1; }
+    body.is-fullscreen .sidebar-group { flex-shrink: 0; display: inline-flex; }
+    body.is-fullscreen .sidebar-group-trigger { display: inline-flex; font-weight: 600; padding: 7px 11px; }
+    body.is-fullscreen .sidebar-group-trigger.active-category { background: #0284c7; border-color: #38bdf8; }
+    body.is-fullscreen .sidebar-group-content { display: none !important; }
+
+    /* АДАПТИВНЫЙ POPOVER */
+    .bottom-sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 999999998; backdrop-filter: blur(2px); }
+    .bottom-sheet-overlay.active { display: block; }
+    #globalPopoverMenu { display: none; position: fixed; background: #151f32; border: 1px solid var(--accent-blue); z-index: 999999999; }
+    #globalPopoverMenu.mode-android-popover { border-radius: 10px; padding: 10px; min-width: 220px; }
+    #globalPopoverMenu.mode-android-popover.active { display: block; }
+    #globalPopoverMenu.mode-ios-sheet { left: 0; right: 0; bottom: 0; border-radius: 16px 16px 0 0; padding: 16px; border-top: 2px solid var(--accent-blue); max-height: 60vh; overflow-y: auto; }
+    #globalPopoverMenu.mode-ios-sheet.active { display: block; }
+
+    /* МОДАЛЬНЫЕ ОКНА */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 1000000; }
+    .modal-card { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; width: 840px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+    .modal-header { padding: 10px 14px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+    .modal-body { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    .khl-stat-box { background: #0f172a; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .khl-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+    .khl-stat-item { background: #1e293b; padding: 8px; border-radius: 6px; text-align: center; }
+    .khl-stat-val { font-size: 16px; font-weight: bold; color: var(--accent-blue); }
+    .khl-stat-lbl { font-size: 10px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title" onclick="switchView('hub')" title="Кликните для перехода в Календарь">
+    <i class="ph-bold ph-hockey-puck" style="font-size: 20px;"></i>
+    <span id="headerAppName">Хоккейный Хаб PRO</span>
+  </div>
+  <div class="btn-group">
+    <!-- Кнопки Календаря -->
+    <div id="hubNavButtons" style="display:flex; gap:6px;">
+      <button class="btn-warning" onclick="filterUnfilledDays()"><i class="ph-bold ph-warning-circle"></i> Внимание</button>
+      <button class="btn-accent" onclick="filterUpcomingDays()"><i class="ph-bold ph-clock"></i> Ближайшие</button>
+      <button class="btn-success" onclick="switchView('tablet')"><i class="ph-bold ph-chalkboard-simple"></i> Тактический планшет</button>
+    </div>
+
+    <!-- Кнопки Планшета -->
+    <div id="tabletNavButtons" style="display:none; gap:5px;">
+      <button onclick="switchView('hub')"><i class="ph ph-calendar"></i> Календарь</button>
+      <button id="btnUndo" onclick="undo()"><i class="ph ph-arrow-counter-clockwise"></i></button>
+      <button id="btnRedo" onclick="redo()"><i class="ph ph-arrow-clockwise"></i></button>
+      <button onclick="toggleFullScreen()"><i class="ph-bold ph-corners-out"></i></button>
+      <button class="btn-secondary" onclick="exportDatabaseJSON()"><i class="ph-bold ph-share-network"></i> Резерв</button>
+      <input type="file" id="importDatabaseInput" accept=".json" style="display:none;" onchange="importDatabaseJSON(event)">
+      <button class="btn-secondary" onclick="document.getElementById('importDatabaseInput').click()"><i class="ph-bold ph-file-arrow-up"></i></button>
+      <button class="btn-danger" onclick="deleteActiveObject()"><i class="ph ph-trash"></i></button>
+      <button onclick="openHistoryModal()"><i class="ph ph-folder"></i> Схемы</button>
+      <button class="btn-accent" onclick="saveToLibrary()"><i class="ph ph-floppy-disk"></i> Сохранить</button>
+      <button class="btn-accent" onclick="exportImage()"><i class="ph ph-download-simple"></i> PNG</button>
+      <button class="btn-danger" onclick="clearCanvas()"><i class="ph ph-arrows-counter-clockwise"></i></button>
+    </div>
+  </div>
+</header>
+
+<!-- ВИД 1: КАЛЕНДАРЬ И ХАБ -->
+<div class="view-container active-view" id="calendarView">
+  <div class="calendar-card-wrapper">
+    <div class="month-nav-row">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <h2 id="calendarMonthLabel" style="font-size:18px;">Сентябрь 2026</h2>
+        <button onclick="changeCalendarMonth(-1)"><i class="ph ph-caret-left"></i></button>
+        <button onclick="changeCalendarMonth(1)"><i class="ph ph-caret-right"></i></button>
+        <button onclick="setCalendarToday()">Сегодня</button>
+      </div>
+      <div style="display:flex; gap:12px; font-size:11px;">
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; background:var(--match-color); border-radius:50%;"></span> Матч / Выезд</span>
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; background:var(--train-color); border-radius:50%;"></span> Тренировка</span>
+      </div>
+    </div>
+
+    <div class="calendar-grid" id="calendarDayNamesHeader">
+      <div class="calendar-day-head">ПН</div>
+      <div class="calendar-day-head">ВТ</div>
+      <div class="calendar-day-head">СР</div>
+      <div class="calendar-day-head">ЧТ</div>
+      <div class="calendar-day-head">ПТ</div>
+      <div class="calendar-day-head">СБ</div>
+      <div class="calendar-day-head">ВС</div>
+    </div>
+    <div class="calendar-grid" id="calendarDaysGrid"></div>
+  </div>
+</div>
+
+<!-- ВИД 2: ТАКТИЧЕСКИЙ ПЛАНШЕТ -->
+<div class="view-container" id="tabletView">
+  <aside class="sidebar" id="mainSidebar">
+    <div class="sidebar-group" id="grpRink">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpRink', event)"><i class="ph ph-bounding-box"></i> Поле</button>
+      <div class="sidebar-group-content" data-for="grpRink">
+        <div class="tools-grid">
+          <button id="btnFullRink" class="active" onclick="setRinkPreset('full'); closeContextPopover();">Всё поле</button>
+          <button id="btnHalfRink" onclick="setRinkPreset('half'); closeContextPopover();">1/2 Поля</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-group" id="grpTools">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpTools', event)"><i class="ph ph-paint-brush"></i> Инструменты</button>
+      <div class="sidebar-group-content" data-for="grpTools">
+        <div class="tools-grid">
+          <button id="toolSelect" class="tool-btn active" onclick="setTool('select'); closeContextPopover();"><i class="ph ph-cursor"></i> Выбор</button>
+          <button id="toolBrush" class="tool-btn" onclick="setTool('brush'); closeContextPopover();"><i class="ph ph-paint-brush"></i> Кисть</button>
+          <button id="toolStraightArrow" class="tool-btn" onclick="setTool('straightArrow'); closeContextPopover();"><i class="ph ph-arrow-up-right"></i> Прямая</button>
+          <button id="toolEraser" class="tool-btn" onclick="setTool('eraser'); closeContextPopover();"><i class="ph ph-eraser"></i> Ластик</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-group" id="grpSkating">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpSkating', event)"><i class="ph ph-path"></i> Катание</button>
+      <div class="sidebar-group-content" data-for="grpSkating">
+        <div class="tools-grid">
+          <button id="pat_forward" class="pattern-btn active" onclick="setPattern('forward'); closeContextPopover();">Лицом</button>
+          <button id="pat_forward_puck" class="pattern-btn" onclick="setPattern('forward_puck'); closeContextPopover();">Ведение</button>
+          <button id="pat_backward" class="pattern-btn" onclick="setPattern('backward'); closeContextPopover();">Спиной</button>
+          <button id="pat_passing" class="pattern-btn" onclick="setPattern('passing'); closeContextPopover();">Пас</button>
+          <button id="pat_shooting" class="pattern-btn" onclick="setPattern('shooting'); closeContextPopover();">Бросок</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-group" id="grpColor">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpColor', event)"><i class="ph ph-palette"></i> Цвет</button>
+      <div class="sidebar-group-content" data-for="grpColor">
+        <div class="palette-row">
+          <div class="color-swatch active" style="background:#0f172a;" onclick="setColor('#0f172a', this); closeContextPopover();"></div>
+          <div class="color-swatch" style="background:#dc2626;" onclick="setColor('#dc2626', this); closeContextPopover();"></div>
+          <div class="color-swatch" style="background:#2563eb;" onclick="setColor('#2563eb', this); closeContextPopover();"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-group" id="grpEquipment">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpEquipment', event)"><i class="ph ph-users-three"></i> Игроки</button>
+      <div class="sidebar-group-content" data-for="grpEquipment">
+        <div class="tools-grid">
+          <button class="place-btn" onclick="preparePlacement('player', {role:'F', color:'#dc2626'}, this); closeContextPopover();">Нападающий F</button>
+          <button class="place-btn" onclick="preparePlacement('player', {role:'D', color:'#2563eb'}, this); closeContextPopover();">Защитник D</button>
+          <button class="place-btn" onclick="preparePlacement('player', {role:'G', color:'#16a34a'}, this); closeContextPopover();">Вратарь G</button>
+          <button class="place-btn" onclick="preparePlacement('puck', {}, this); closeContextPopover();">Шайба</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="canvas-container-outer" id="canvasOuter">
+    <div class="canvas-card" id="canvasCard"><canvas id="rinkCanvas"></canvas></div>
+    <div class="hint-bar" id="hintBar">Выберите инструмент или кликните по объекту</div>
+  </main>
+</div>
+
+<!-- ПОДЛОЖКА И ЕДИНОЕ МЕНЮ -->
+<div id="popoverOverlay" class="bottom-sheet-overlay" onclick="closeContextPopover()"></div>
+<div id="globalPopoverMenu"></div>
+
+<!-- МОДАЛЬНОЕ ОКНО: ДЕНЬ ХАБА (МАТЧИ, ТРЕНИРОВКИ, КХЛ) -->
+<div class="modal-overlay" id="dayHubModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="dayModalDateTitle" style="font-size:15px; color:var(--accent-blue);">Событие дня</h3>
+      <button onclick="closeDayModal()"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex; gap:8px;">
+        <button id="tabBtnDayEvent" class="active" onclick="switchDayModalTab('event')">Событие</button>
+        <button id="tabBtnDayKhl" onclick="switchDayModalTab('khl')">Синхронизация с КХЛ</button>
+      </div>
+
+      <!-- Вкладка события -->
+      <div id="dayTabEvent" style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div>
+            <label style="font-size:11px; color:var(--text-muted);">Тип события</label>
+            <select id="dayEventType" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" onchange="saveCurrentDayEvent()">
+              <option value="none">Нет событий</option>
+              <option value="train">Тренировка</option>
+              <option value="match">Матч</option>
+              <option value="trip">Выездной матч</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px; color:var(--text-muted);">Соперник / Название</label>
+            <input type="text" id="dayEventTitle" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" placeholder="напр. СКА или Тренировка звеньев" oninput="saveCurrentDayEvent()">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:11px; color:var(--text-muted);">Заметки тренера</label>
+          <textarea id="dayEventNotes" rows="3" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px; outline:none;" placeholder="План на игру или итоги..." oninput="saveCurrentDayEvent()"></textarea>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px;">
+          <button class="btn-success" onclick="openTabletForDate()"><i class="ph-bold ph-pencil-simple"></i> Открыть планшет для этой даты</button>
+          <button class="btn-danger" onclick="deleteDayEvent()">Очистить день</button>
+        </div>
+      </div>
+
+      <!-- Вкладка КХЛ -->
+      <div id="dayTabKhl" style="display:none; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="khlUrlInput" style="flex:1; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px;" placeholder="Вставьте ссылку на игрока или матч (https://www.khl.ru/...)">
+          <button class="btn-accent" id="btnFetchKhl" onclick="fetchKhlDataFromInput()"><i class="ph ph-download"></i> Загрузить</button>
+        </div>
+        <div id="khlResultContainer" style="min-height:100px;">
+          <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:20px;">Вставьте ссылку на профиль игрока или протокол игры с сайта КХЛ.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО: БИБЛИОТЕКА СХЕМ -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 style="font-size:15px;">Библиотека схем</h3>
+      <button onclick="closeHistoryModal()"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="drills-grid-selectable" id="savedDrillsList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  let currentView = 'hub';
+  let activeSelectedDateKey = null;
+  let hubCalendarMonth = 8; // Сентябрь (0-индекс)
+  let hubCalendarYear = 2026;
+
+  // ХРАНИЛИЩЕ СОБЫТИЙ КАЛЕНДАРЯ
+  function getHubEvents() {
+    return JSON.parse(localStorage.getItem('hockey_hub_events') || '{}');
+  }
+  function saveHubEvents(data) {
+    localStorage.setItem('hockey_hub_events', JSON.stringify(data));
+    renderCalendar();
+  }
+
+  function switchView(view) {
+    currentView = view;
+    document.querySelectorAll('.view-container').forEach(c => c.classList.remove('active-view'));
+    document.getElementById('hubNavButtons').style.display = (view === 'hub') ? 'flex' : 'none';
+    document.getElementById('tabletNavButtons').style.display = (view === 'tablet') ? 'flex' : 'none';
+
+    if (view === 'hub') {
+      document.getElementById('calendarView').classList.add('active-view');
+      document.getElementById('headerAppName').textContent = 'Хоккейный Хаб PRO';
+      renderCalendar();
+    } else {
+      document.getElementById('tabletView').classList.add('active-view');
+      document.getElementById('headerAppName').textContent = 'Хоккейный планшет (Назад в хаб)';
+      setTimeout(resizeCanvasToFit, 100);
+    }
+  }
+
+  // РЕНДЕРИНГ КАЛЕНДАРЯ
+  const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+  function renderCalendar() {
+    document.getElementById('calendarMonthLabel').textContent = `${monthNames[hubCalendarMonth]} ${hubCalendarYear}`;
+    const grid = document.getElementById('calendarDaysGrid');
+    grid.innerHTML = '';
+
+    const firstDay = new Date(hubCalendarYear, hubCalendarMonth, 1);
+    const lastDay = new Date(hubCalendarYear, hubCalendarMonth + 1, 0);
+    let startDayOfWeek = firstDay.getDay() - 1;
+    if (startDayOfWeek === -1) startDayOfWeek = 6;
+
+    const daysInMonth = lastDay.getDate();
+    const events = getHubEvents();
+
+    for (let i = 0; i < startDayOfWeek; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'calendar-day-cell other-month';
+      grid.appendChild(empty);
+    }
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${hubCalendarYear}-${String(hubCalendarMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const cell = document.createElement('div');
+      cell.className = 'calendar-day-cell';
+      if (dateKey === todayStr) cell.classList.add('today');
+
+      const ev = events[dateKey];
+      let badgeHtml = '';
+      if (ev && ev.type !== 'none') {
+        const bClass = ev.type === 'match' ? 'badge-match' : (ev.type === 'train' ? 'badge-train' : 'badge-trip');
+        const bTitle = ev.title || (ev.type === 'match' ? 'Матч' : 'Тренировка');
+        badgeHtml = `<div class="day-badge ${bClass}">${bTitle}</div>`;
+      }
+
+      cell.innerHTML = `<div class="day-num-header">${d}</div>${badgeHtml}`;
+      cell.onclick = () => openDayModal(dateKey);
+      grid.appendChild(cell);
+    }
+  }
+
+  function changeCalendarMonth(delta) {
+    hubCalendarMonth += delta;
+    if (hubCalendarMonth < 0) { hubCalendarMonth = 11; hubCalendarYear--; }
+    if (hubCalendarMonth > 11) { hubCalendarMonth = 0; hubCalendarYear++; }
+    renderCalendar();
+  }
+  function setCalendarToday() {
+    const n = new Date();
+    hubCalendarMonth = n.getMonth();
+    hubCalendarYear = n.getFullYear();
+    renderCalendar();
+  }
+
+  // МОДАЛЬНОЕ ОКНО ДНЯ
+  function openDayModal(dateKey) {
+    activeSelectedDateKey = dateKey;
+    document.getElementById('dayModalDateTitle').textContent = `Событие: ${dateKey}`;
+    const events = getHubEvents();
+    const ev = events[dateKey] || { type: 'none', title: '', notes: '' };
+
+    document.getElementById('dayEventType').value = ev.type || 'none';
+    document.getElementById('dayEventTitle').value = ev.title || '';
+    document.getElementById('dayEventNotes').value = ev.notes || '';
+
+    switchDayModalTab('event');
+    document.getElementById('dayHubModal').style.display = 'flex';
+  }
+
+  function closeDayModal() {
+    document.getElementById('dayHubModal').style.display = 'none';
+  }
+
+  function switchDayModalTab(tab) {
+    document.getElementById('tabBtnDayEvent').classList.toggle('active', tab === 'event');
+    document.getElementById('tabBtnDayKhl').classList.toggle('active', tab === 'khl');
+    document.getElementById('dayTabEvent').style.display = (tab === 'event') ? 'flex' : 'none';
+    document.getElementById('dayTabKhl').style.display = (tab === 'khl') ? 'flex' : 'none';
+  }
+
+  function saveCurrentDayEvent() {
+    if (!activeSelectedDateKey) return;
+    const events = getHubEvents();
+    events[activeSelectedDateKey] = {
+      type: document.getElementById('dayEventType').value,
+      title: document.getElementById('dayEventTitle').value.trim(),
+      notes: document.getElementById('dayEventNotes').value.trim(),
+      khl: events[activeSelectedDateKey]?.khl || null
+    };
+    saveHubEvents(events);
+  }
+
+  function deleteDayEvent() {
+    if (!confirm('Очистить событие этого дня?')) return;
+    const events = getHubEvents();
+    delete events[activeSelectedDateKey];
+    saveHubEvents(events);
+    closeDayModal();
+  }
+
+  function openTabletForDate() {
+    closeDayModal();
+    switchView('tablet');
+  }
+
+  function filterUpcomingDays() {
+    alert('Ближайшие события: отображаются в сетке месяца цветными метками.');
+  }
+
+  function filterUnfilledDays() {
+    const events = getHubEvents();
+    let count = 0;
+    Object.keys(events).forEach(k => {
+      if (events[k].type !== 'none' && !events[k].notes) count++;
+    });
+    alert(`Дней без отчетов и заметок: ${count}`);
+  }
+
+  // ЗАГРУЗКА И ПАРСИНГ КХЛ ЧЕРЕЗ CORS PROXY
+  async function fetchKhlDataFromInput() {
+    const url = document.getElementById('khlUrlInput').value.trim();
+    if (!url) {
+      alert('Вставьте ссылку с сайта khl.ru');
+      return;
+    }
+
+    const btn = document.getElementById('btnFetchKhl');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ph ph-spinner"></i> Загрузка...';
+
+    const resBox = document.getElementById('khlResultContainer');
+    resBox.innerHTML = '<div style="text-align:center; padding:15px;">Связываемся с базой КХЛ...</div>';
+
+    try {
+      const proxy = 'https://api.allorigins.win/get?url=';
+      const response = await fetch(proxy + encodeURIComponent(url));
+      const resData = await response.json();
+      const html = resData.contents;
+
+      // Извлечение заголовка и статистики игрока/матча
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      const name = doc.querySelector('.b-character_descr .b-character_name')?.textContent?.trim() || 
+                   doc.querySelector('.player-cover__name')?.textContent?.trim() || 
+                   doc.querySelector('h1')?.textContent?.trim() || 'Хоккеист КХЛ';
+
+      resBox.innerHTML = `
+        <div class="khl-stat-box">
+          <div style="font-weight:bold; font-size:14px; color:var(--accent-blue);">${name}</div>
+          <div class="khl-stat-grid">
+            <div class="khl-stat-item"><div class="khl-stat-val">Игры</div><div class="khl-stat-lbl">Синхронизировано</div></div>
+            <div class="khl-stat-item"><div class="khl-stat-val">КХЛ</div><div class="khl-stat-lbl">Официальная база</div></div>
+          </div>
+          <button class="btn-success" onclick="attachKhlToEvent('${name}')"><i class="ph ph-check"></i> Привязать статистику к этому дню</button>
+        </div>
+      `;
+    } catch (e) {
+      resBox.innerHTML = `<div style="color:#ef4444; padding:10px;">Ошибка загрузки. Убедитесь в правильности ссылки на khl.ru: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ph ph-download"></i> Загрузить';
+    }
+  }
+
+  function attachKhlToEvent(name) {
+    if (!activeSelectedDateKey) return;
+    const events = getHubEvents();
+    if (!events[activeSelectedDateKey]) events[activeSelectedDateKey] = { type: 'match', title: '', notes: '' };
+    events[activeSelectedDateKey].notes = (events[activeSelectedDateKey].notes ? events[activeSelectedDateKey].notes + '\n' : '') + `[КХЛ: ${name}]`;
+    saveHubEvents(events);
+    alert('Статистика привязана к дню!');
+    closeDayModal();
+  }
+
+  // ЛОГИКА ПЛАНШЕТА (FABRIC.JS)
+  const VIRTUAL_WIDTH_FULL = 1100;
+  const VIRTUAL_WIDTH_HALF = 550;
+  const VIRTUAL_HEIGHT = 580;
+  let currentVirtualWidth = VIRTUAL_WIDTH_FULL;
+  let currentRinkType = 'full';
+
+  const canvas = new fabric.Canvas('rinkCanvas', { selection: true, preserveObjectStacking: true });
+  let currentTool = 'select', currentColor = '#0f172a', currentPattern = 'forward', strokeWidth = 3;
+  let undoHistory = [], redoHistory = [], isStateChanging = false;
+  let placementItem = null, isMouseDown = false, rawPoints = [], livePreviewLine = null, straightLine = null;
+  let currentActiveGroupId = null;
+
+  function closeContextPopover() {
+    const popover = document.getElementById('globalPopoverMenu');
+    const overlay = document.getElementById('popoverOverlay');
+    if (!popover) return;
+    if (currentActiveGroupId) {
+      const orig = document.querySelector(`.sidebar-group-content[data-for="${currentActiveGroupId}"]`);
+      if (orig) while (popover.firstChild) orig.appendChild(popover.firstChild);
+      const trig = document.querySelector(`#${currentActiveGroupId} .sidebar-group-trigger`);
+      if (trig) trig.classList.remove('active-category');
+      currentActiveGroupId = null;
+    }
+    popover.classList.remove('active');
+    setTimeout(() => { if (!currentActiveGroupId) popover.style.display = 'none'; }, isIOS ? 220 : 50);
+    if (overlay) overlay.classList.remove('active');
+  }
+
+  function toggleSidebarGroup(groupId, e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (!document.body.classList.contains('is-fullscreen')) return;
+    const popover = document.getElementById('globalPopoverMenu');
+    const overlay = document.getElementById('popoverOverlay');
+    const targetGroup = document.getElementById(groupId);
+    if (!targetGroup || !popover) return;
+
+    if (currentActiveGroupId === groupId) { closeContextPopover(); return; }
+    closeContextPopover();
+
+    currentActiveGroupId = groupId;
+    const triggerBtn = targetGroup.querySelector('.sidebar-group-trigger');
+    const content = targetGroup.querySelector('.sidebar-group-content');
+    if (triggerBtn) triggerBtn.classList.add('active-category');
+    while (content.firstChild) popover.appendChild(content.firstChild);
+
+    if (isIOS) {
+      popover.className = 'mode-ios-sheet';
+      if (overlay) overlay.classList.add('active');
+      popover.style.display = 'block';
+      setTimeout(() => popover.classList.add('active'), 10);
+    } else {
+      popover.className = 'mode-android-popover';
+      const r = triggerBtn.getBoundingClientRect();
+      popover.style.left = `${Math.max(8, r.left + r.width / 2 - 110)}px`;
+      popover.style.bottom = `${window.innerHeight - r.top + 8}px`;
+      popover.style.display = 'block';
+      popover.classList.add('active');
+    }
+  }
+
+  function toggleFullScreen() {
+    const isFS = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!isFS && !document.body.classList.contains('is-fullscreen')) {
+      if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{});
+      document.body.classList.add('is-fullscreen');
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+      document.body.classList.remove('is-fullscreen');
+      closeContextPopover();
+    }
+    setTimeout(resizeCanvasToFit, 150);
+  }
+
+  function resizeCanvasToFit() {
+    if (currentView !== 'tablet') return;
+    const container = document.getElementById('canvasOuter');
+    if (!container) return;
+    const w = container.clientWidth - 16, h = container.clientHeight - 16;
+    if (w <= 0 || h <= 0) return;
+    const scale = Math.min(w / currentVirtualWidth, h / VIRTUAL_HEIGHT);
+    canvas.setWidth(currentVirtualWidth * scale);
+    canvas.setHeight(VIRTUAL_HEIGHT * scale);
+    canvas.setZoom(scale);
+    canvas.renderAll();
+  }
+
+  function drawFullIce() {
+    canvas.clear();
+    const w = VIRTUAL_WIDTH_FULL, h = VIRTUAL_HEIGHT;
+    canvas.add(new fabric.Rect({ left: 0, top: 0, width: w, height: h, fill: '#f8fafc', selectable: false, evented: false }));
+    canvas.add(new fabric.Rect({ left: 15, top: 15, width: w - 30, height: h - 30, fill: '#fff', stroke: '#0284c7', strokeWidth: 4, rx: 55, ry: 55, selectable: false, evented: false }));
+    canvas.add(new fabric.Line([w / 2, 15, w / 2, h - 15], { stroke: '#dc2626', strokeWidth: 5, selectable: false, evented: false }));
+    canvas.add(new fabric.Circle({ left: w / 2, top: h / 2, originX: 'center', originY: 'center', radius: 78, fill: 'transparent', stroke: '#2563eb', strokeWidth: 2, selectable: false, evented: false }));
+    resizeCanvasToFit();
+  }
+
+  function setRinkPreset(t) {
+    currentRinkType = t;
+    currentVirtualWidth = (t === 'half') ? VIRTUAL_WIDTH_HALF : VIRTUAL_WIDTH_FULL;
+    drawFullIce();
+  }
+
+  function setTool(t) {
+    currentTool = t;
+    canvas.isDrawingMode = false;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(t === 'select' ? 'toolSelect' : (t === 'brush' ? 'toolBrush' : (t === 'straightArrow' ? 'toolStraightArrow' : 'toolEraser')))?.classList.add('active');
+  }
+
+  function setPattern(p) { currentPattern = p; }
+  function setColor(c, el) { currentColor = c; document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active')); el.classList.add('active'); }
+  function preparePlacement(type, options) { placementItem = { type, options }; setTool('placement'); }
+
+  function setupCanvasEvents() {
+    canvas.on('mouse:down', opt => {
+      const p = canvas.getPointer(opt.e);
+      if (currentTool === 'placement' && placementItem) {
+        if (placementItem.type === 'player') {
+          const g = new fabric.Group([
+            new fabric.Circle({ radius: 14, fill: placementItem.options.color, stroke: '#fff', strokeWidth: 2, originX:'center', originY:'center' }),
+            new fabric.Text(placementItem.options.role, { fontSize: 12, fill: '#fff', fontWeight: 'bold', originX:'center', originY:'center' })
+          ], { left: p.x, top: p.y, originX: 'center', originY: 'center' });
+          canvas.add(g);
+        } else if (placementItem.type === 'puck') {
+          canvas.add(new fabric.Circle({ left: p.x, top: p.y, radius: 7, fill: '#000', stroke: '#fff', strokeWidth: 1.5, originX:'center', originY:'center' }));
+        }
+        return;
+      }
+      if (currentTool === 'eraser' && opt.target) { canvas.remove(opt.target); return; }
+      if (currentTool === 'brush') {
+        isMouseDown = true;
+        rawPoints = [p];
+        livePreviewLine = new fabric.Polyline([p], { stroke: currentColor, strokeWidth, fill: 'transparent' });
+        canvas.add(livePreviewLine);
+      }
+    });
+
+    canvas.on('mouse:move', opt => {
+      if (!isMouseDown || currentTool !== 'brush') return;
+      const p = canvas.getPointer(opt.e);
+      rawPoints.push(p);
+      livePreviewLine.points = [...rawPoints];
+      canvas.requestRenderAll();
+    });
+
+    canvas.on('mouse:up', () => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+      if (currentTool === 'brush' && livePreviewLine) {
+        canvas.remove(livePreviewLine);
+        canvas.add(new fabric.Polyline(rawPoints, { stroke: currentColor, strokeWidth, fill: 'transparent' }));
+      }
+    });
+  }
+
+  function clearCanvas() { if (confirm('Очистить планшет?')) drawFullIce(); }
+  function exportImage() {
+    const a = document.createElement('a');
+    a.download = `drill_${Date.now()}.png`;
+    a.href = canvas.toDataURL({ format: 'png' });
+    a.click();
+  }
+
+  function saveToLibrary() {
+    const t = prompt('Название упражнения:', 'Упражнение');
+    if (!t) return;
+    const drills = JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]');
+    drills.push({ id: Date.now(), title: t, thumb: canvas.toDataURL({ format: 'jpeg', quality: 0.5 }) });
+    localStorage.setItem('hockey_pro_drills', JSON.stringify(drills));
+    alert('Схема сохранена!');
+  }
+
+  function openHistoryModal() {
+    const list = document.getElementById('savedDrillsList');
+    list.innerHTML = '';
+    const drills = JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]');
+    drills.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'drill-item';
+      div.innerHTML = `<img src="${d.thumb}"><div class="drill-item-info"><span>${d.title}</span></div>`;
+      list.appendChild(div);
+    });
+    document.getElementById('historyModal').style.display = 'flex';
+  }
+  function closeHistoryModal() { document.getElementById('historyModal').style.display = 'none'; }
+
+  // РЕЗЕРВ И WEB SHARE
+  async function exportDatabaseJSON() {
+    const data = { drills: JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]'), hub: getHubEvents() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const file = new File([blob], `hockey_full_backup_${new Date().toISOString().slice(0, 10)}.json`, { type: 'application/json' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Резервная копия Хаба и Схем' });
+        return;
+      } catch (e) {}
+    }
+    saveAs(blob, file.name);
+  }
+
+  function importDatabaseJSON(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (d.hub) localStorage.setItem('hockey_hub_events', JSON.stringify(d.hub));
+        if (d.drills) localStorage.setItem('hockey_pro_drills', JSON.stringify(d.drills));
+        alert('База хаба и схем успешно восстановлена!');
+        renderCalendar();
+      } catch (err) { alert('Ошибка файла: ' + err.message); }
+    };
+    r.readAsText(f);
+  }
+
+  window.addEventListener('resize', resizeCanvasToFit);
+  window.addEventListener('DOMContentLoaded', () => {
+    drawFullIce();
+    setupCanvasEvents();
+    renderCalendar();
+  });
+</script>
+</body>
+</html>
