@@ -151,6 +151,7 @@
       padding: 14px;
       gap: 14px;
       background-color: var(--bg-dark);
+      z-index: 10;
     }
     .calendar-card-wrapper {
       background: var(--panel-bg);
@@ -190,9 +191,10 @@
       flex-direction: column;
       gap: 4px;
       cursor: pointer;
-      transition: border-color 0.15s ease;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      touch-action: manipulation;
     }
-    .calendar-day-cell:hover { border-color: var(--accent-blue); }
+    .calendar-day-cell:hover { border-color: var(--accent-blue); background: #1a2744; }
     .calendar-day-cell.other-month { opacity: 0.3; }
     .calendar-day-cell.today { border-color: #38bdf8; background: #132238; }
     .day-num-header { font-size: 12px; font-weight: bold; }
@@ -497,7 +499,10 @@
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 1000000;
+      z-index: 10000000;
+    }
+    #dayHubModal {
+      z-index: 10000002 !important;
     }
     #imagePreviewModal, #playerDetailsModal {
       z-index: 20000000 !important;
@@ -514,6 +519,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.9);
     }
     .modal-header {
       padding: 10px 14px;
@@ -814,13 +820,6 @@
       cursor: pointer;
     }
 
-    /* БЛОКИ КХЛ / МХЛ СТАТИСТИКИ */
-    .khl-stat-box { background: #0f172a; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-    .khl-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
-    .khl-stat-item { background: #1e293b; padding: 8px; border-radius: 6px; text-align: center; }
-    .khl-stat-val { font-size: 16px; font-weight: bold; color: var(--accent-blue); }
-    .khl-stat-lbl { font-size: 10px; color: var(--text-muted); }
-
     @media (max-width: 768px) {
       .header-title span {
         display: none;
@@ -1057,96 +1056,98 @@
 <div id="popoverOverlay" class="bottom-sheet-overlay" onclick="closeContextPopover()"></div>
 <div id="globalPopoverMenu"></div>
 
-<!-- МОДАЛЬНОЕ ОКНО: БИБЛИОТЕКА СХЕМ -->
-<div class="modal-overlay" id="historyModal">
-  <div class="modal-card">
+<!-- МОДАЛЬНОЕ ОКНО ДНЯ (ХАБ: СОБЫТИЯ + ПОЛНОЦЕННЫЙ ПРОТОКОЛ МАТЧА) -->
+<div class="modal-overlay" id="dayHubModal">
+  <div class="modal-card" style="width: 890px;">
     <div class="modal-header">
-      <h3 style="font-size:15px;">Библиотека схем и упражнений</h3>
-      <button onclick="closeHistoryModal()" style="font-size: 14px; font-weight: bold; cursor: pointer; padding: 4px 8px;"><i class="ph ph-x"></i></button>
-    </div>
-    <div class="modal-body" style="gap: 10px;">
-      <div class="filter-bar-row">
-        <input type="text" id="librarySearchInput" class="search-input-box" placeholder="🔍 Поиск схемы по названию..." oninput="renderLibraryModalGrid()">
-        <select id="librarySortSelect" class="select-sort-box" onchange="renderLibraryModalGrid()">
-          <option value="newest">Сначала новые</option>
-          <option value="oldest">Сначала старые</option>
-          <option value="title">По названию (А-Я)</option>
-        </select>
-      </div>
-      <div class="drills-grid-selectable" id="savedDrillsList" style="max-height: 480px;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- МОДАЛЬНОЕ ОКНО: ПРЕВЬЮ СХЕМЫ -->
-<div class="modal-overlay" id="imagePreviewModal">
-  <div class="modal-card" style="width: 760px; align-items: center; padding: 15px;">
-    <div class="modal-header" style="width: 100%; border-bottom: none; padding-bottom: 0;">
-      <h3 id="previewModalTitle" style="font-size: 16px; color: var(--accent-blue);">Предпросмотр</h3>
-      <button onclick="closeImagePreview()"><i class="ph ph-x"></i></button>
-    </div>
-    <div style="width: 100%; display: flex; justify-content: center; align-items: center; margin-top: 10px; background: #fff; border-radius: 8px; overflow: hidden; padding: 10px;">
-      <img id="previewModalImg" src="" style="max-width: 100%; max-height: 72vh; object-fit: contain;">
-    </div>
-  </div>
-</div>
-
-<!-- МОДАЛЬНОЕ ОКНО: КОНСТРУКТОР ТРЕНИРОВКИ (DOCX) -->
-<div class="modal-overlay" id="workoutBuilderModal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h3 style="font-size:15px; display:flex; align-items:center; gap:8px;">
-        <i class="ph-bold ph-file-doc" style="color:var(--accent-blue);"></i> Конструктор конспекта тренировки (Word DOCX)
-      </h3>
-      <button onclick="closeWorkoutBuilderModal()"><i class="ph ph-x"></i></button>
+      <h3 id="dayModalDateTitle" style="font-size:15px; color:var(--accent-blue);">Событие дня</h3>
+      <button onclick="closeDayModal()"><i class="ph ph-x"></i></button>
     </div>
     <div class="modal-body">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Тема / Название тренировки</label>
-          <input type="text" id="workoutTitleInput" value="Лед утро 27.07.26">
+      <div style="display:flex; gap:8px;">
+        <button id="tabBtnDayEvent" class="active" onclick="switchDayModalTab('event')">Событие</button>
+        <button id="tabBtnDayMatchView" onclick="switchDayModalTab('matchView')">Протокол и составы матча</button>
+        <button id="tabBtnDayKhl" onclick="switchDayModalTab('khl')">Синхронизация с КХЛ / МХЛ</button>
+      </div>
+
+      <!-- Вкладка 1: Событие дня -->
+      <div id="dayTabEvent" style="display:flex; flex-direction:column; gap:10px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div>
+            <label style="font-size:11px; color:var(--text-muted);">Тип события</label>
+            <select id="dayEventType" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" onchange="saveCurrentDayEvent()">
+              <option value="none">Нет событий</option>
+              <option value="train">Тренировка</option>
+              <option value="match">Матч</option>
+              <option value="trip">Выездной матч</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px; color:var(--text-muted);">Соперник / Название</label>
+            <input type="text" id="dayEventTitle" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:6px;" placeholder="напр. Алмаз – Академия Михайлова" oninput="saveCurrentDayEvent()">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Время проведения</label>
-          <input type="text" id="workoutTimeInput" value="8.45-10.15">
+
+        <div>
+          <label style="font-size:11px; color:var(--text-muted);">Заметки тренера</label>
+          <textarea id="dayEventNotes" rows="3" style="width:100%; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px; outline:none;" placeholder="План на игру или итоги..." oninput="saveCurrentDayEvent()"></textarea>
         </div>
-        <div class="form-group">
-          <label>Продолжительность</label>
-          <input type="text" id="workoutDurationInput" value="90 минут">
+
+        <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px;">
+          <button class="btn-success" onclick="openTabletForDate()"><i class="ph-bold ph-pencil-simple"></i> Открыть планшет для этой даты</button>
+          <button class="btn-danger" onclick="deleteDayEvent()">Очистить день</button>
         </div>
       </div>
 
-      <div class="selected-queue-container" id="workoutQueueContainer" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:11px; font-weight:700; color:var(--accent-blue); text-transform:uppercase;">
-            <i class="ph-bold ph-list-numbers"></i> Очередь упражнений в тренировке (порядок в Word)
-          </span>
-          <span style="font-size:11px; color:var(--text-muted);" id="queueCountLabel">0 шт.</span>
+      <!-- Вкладка 2: Интерактивная таблица матча и составов -->
+      <div id="dayTabMatchView" style="display:none; flex-direction:column; gap:12px;">
+        <div id="matchProtocolContent">
+          <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:30px;">
+            К этому дню пока не привязан матч. Перейдите во вкладку «Синхронизация» и укажите ссылку на игру.
+          </div>
         </div>
-        <div class="selected-queue-track" id="selectedQueueTrack"></div>
       </div>
 
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
-          <div class="section-title" style="margin-bottom:0;">Каталог упражнений (нажмите «+» чтобы добавить в очередь)</div>
+      <!-- Вкладка 3: Синхронизация по ссылке -->
+      <div id="dayTabKhl" style="display:none; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="khlUrlInput" style="flex:1; background:#0f172a; border:1px solid var(--border-color); color:#fff; padding:8px; border-radius:6px;" placeholder="Вставьте ссылку на игру (напр. https://mhl.khl.ru/game/1440/903085/)">
+          <button class="btn-accent" id="btnFetchKhl" onclick="fetchKhlDataFromInput()"><i class="ph ph-download"></i> Загрузить</button>
         </div>
-        <div class="filter-bar-row" style="margin-bottom: 6px;">
-          <input type="text" id="drillSearchInput" class="search-input-box" placeholder="🔍 Поиск по названию схемы..." oninput="filterDrillsGrid()">
-          <select id="workoutSortSelect" class="select-sort-box" onchange="filterDrillsGrid()">
-            <option value="newest">Сначала новые</option>
-            <option value="oldest">Сначала старые</option>
-            <option value="title">По названию (А-Я)</option>
-          </select>
+        <div id="khlResultContainer" style="min-height:100px;">
+          <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:20px;">
+            Вставьте ссылку на матч или игрока с сайта mhl.khl.ru или khl.ru.
+          </div>
         </div>
-        <div class="drills-grid-selectable" id="workoutSelectableGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО: КАРТОЧКА СТАТИСТИКИ ИГРОКА ПО МАТЧУ -->
+<div class="modal-overlay" id="playerDetailsModal">
+  <div class="modal-card" style="width: 520px;">
+    <div class="modal-header">
+      <h3 id="pdmName" style="font-size:15px; color:var(--accent-blue);">Статистика игрока в матче</h3>
+      <button onclick="closePlayerModal()"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body" style="gap:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:10px; border-radius:8px;">
+        <div>
+          <div id="pdmClubRole" style="font-size:12px; color:var(--text-muted);">Команда • Амплуа</div>
+          <div id="pdmMatchContext" style="font-size:11px; color:#fff; font-weight:bold; margin-top:2px;">В рамках матча</div>
+        </div>
+        <div id="pdmNum" class="player-num-pill" style="font-size:16px; padding:4px 10px;">#--</div>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:12px;">
-        <div style="font-size:12px; color:var(--text-muted);" id="selectedCountLabel">Выбрано упражнений: 0</div>
-        <div style="display:flex; gap:8px;">
-          <button onclick="closeWorkoutBuilderModal()">Отмена</button>
-          <button id="btnGenerateDocx" class="btn-success" onclick="generateWordDocument()"><i class="ph-bold ph-download"></i> Собрать и скачать DOCX</button>
-        </div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmGoals">0</div><div class="khl-stat-lbl">Голы</div></div>
+        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmAssists">0</div><div class="khl-stat-lbl">Передачи</div></div>
+        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmPoints">0</div><div class="khl-stat-lbl">Очки (Г+П)</div></div>
+        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmPlusMinus">0</div><div class="khl-stat-lbl">+/-</div></div>
+        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmPim">0</div><div class="khl-stat-lbl">Штраф (мин)</div></div>
+        <div class="khl-stat-item"><div class="khl-stat-val" id="pdmShots">0</div><div class="khl-stat-lbl">Броски</div></div>
+        <div class="khl-stat-item" style="grid-column: span 3;"><div class="khl-stat-val" id="pdmTime" style="font-size:14px;">--:--</div><div class="khl-stat-lbl">Время на льду в матче</div></div>
       </div>
     </div>
   </div>
@@ -1158,8 +1159,9 @@
 
   let currentView = 'hub';
   let activeSelectedDateKey = null;
-  let hubCalendarMonth = 8; // Сентябрь 2026
+  let hubCalendarMonth = 8; // Сентябрь
   let hubCalendarYear = 2026;
+  let currentActiveRosterTab = 'home';
 
   function getHubEvents() {
     return JSON.parse(localStorage.getItem('hockey_hub_events') || '{}');
@@ -1217,14 +1219,17 @@
 
       const ev = events[dateKey];
       let badgeHtml = '';
-      if (ev && ev.type !== 'none') {
+      if (ev && ev.type && ev.type !== 'none') {
         const bClass = ev.type === 'match' ? 'badge-match' : (ev.type === 'train' ? 'badge-train' : 'badge-trip');
         const bTitle = ev.title || (ev.type === 'match' ? 'Матч' : 'Тренировка');
         badgeHtml = `<div class="day-badge ${bClass}">${bTitle}</div>`;
       }
 
       cell.innerHTML = `<div class="day-num-header">${d}</div>${badgeHtml}`;
-      cell.onclick = () => openDayModal(dateKey);
+      cell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openDayModal(dateKey);
+      });
       grid.appendChild(cell);
     }
   }
@@ -1242,6 +1247,7 @@
     renderCalendar();
   }
 
+  // НАДЕЖНОЕ ОТКРЫТИЕ МОДАЛЬНОГО ОКНА ДНЯ
   function openDayModal(dateKey) {
     activeSelectedDateKey = dateKey;
     document.getElementById('dayModalDateTitle').textContent = `Событие: ${dateKey}`;
@@ -1252,18 +1258,24 @@
     document.getElementById('dayEventTitle').value = ev.title || '';
     document.getElementById('dayEventNotes').value = ev.notes || '';
 
+    const modal = document.getElementById('dayHubModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.style.visibility = 'visible';
+      modal.style.opacity = '1';
+    }
+
     if (ev.matchData) {
       renderFullMatchProtocol(ev.matchData);
       switchDayModalTab('matchView');
     } else {
       switchDayModalTab('event');
     }
-
-    document.getElementById('dayHubModal').style.display = 'flex';
   }
 
   function closeDayModal() {
-    document.getElementById('dayHubModal').style.display = 'none';
+    const modal = document.getElementById('dayHubModal');
+    if (modal) modal.style.display = 'none';
   }
 
   function switchDayModalTab(tab) {
@@ -1301,7 +1313,7 @@
   }
 
   function filterUpcomingDays() {
-    alert('Ближайшие события отмечены цветными бейджами прямо в календаре месяца.');
+    alert('Ближайшие события отмечены цветными бейджами прямо в сетке календаря.');
   }
 
   function filterUnfilledDays() {
@@ -1310,10 +1322,10 @@
     Object.keys(events).forEach(k => {
       if (events[k].type !== 'none' && !events[k].notes) count++;
     });
-    alert(`Дней без заметок/отчетов: ${count}`);
+    alert(`Дней без заметок и отчетов: ${count}`);
   }
 
-  // НАДЕЖНЫЙ СЕТЕВОЙ ЗАПРОС
+  // ЗАПРОС ЧЕРЕЗ РЕЗЕРВНЫЙ ШЛЮЗ
   async function fetchRawHtmlWithFallback(targetUrl) {
     const endpoints = [
       (u) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
@@ -1340,10 +1352,10 @@
         }
       } catch (err) {}
     }
-    throw new Error('Шлюз временно недоступен. Проверьте интернет.');
+    throw new Error('Шлюз временно заблокирован защитой сайта лиги.');
   }
 
-  // ПАРСИНГ И ПОЛНАЯ СИНХРОНИЗАЦИЯ С КХЛ/МХЛ
+  // ПАРСИНГ И ПОЛНАЯ СИНХРОНИЗАЦИЯ
   async function fetchKhlDataFromInput() {
     const rawInput = document.getElementById('khlUrlInput').value.trim();
     if (!rawInput) {
@@ -1353,10 +1365,10 @@
 
     const btn = document.getElementById('btnFetchKhl');
     btn.disabled = true;
-    btn.innerHTML = '<i class="ph ph-spinner"></i> Загрузка протокола...';
+    btn.innerHTML = '<i class="ph ph-spinner"></i> Загрузка...';
 
     const resBox = document.getElementById('khlResultContainer');
-    resBox.innerHTML = '<div style="text-align:center; padding:15px; color:var(--accent-blue);">Считываем протокол и составы команд...</div>';
+    resBox.innerHTML = '<div style="text-align:center; padding:15px; color:var(--accent-blue);">Считываем протокол матча...</div>';
 
     const isMhl = rawInput.includes('mhl.') || (!rawInput.includes('khl.ru') && rawInput.length > 0);
     const leagueName = isMhl ? 'МХЛ' : 'КХЛ';
@@ -1466,13 +1478,14 @@
       resBox.innerHTML = `
         <div style="color:#ef4444; padding:8px; font-size:11px; text-align:center;">
           ${e.message}<br>
-          <div style="display:flex; gap:4px; margin-top:8px;">
-            <input type="text" id="fbHome" placeholder="Хозяева" value="Алмаз" style="background:#1e293b; border:1px solid var(--border-color); color:#fff; padding:4px; border-radius:4px; flex:1; font-size:11px;">
-            <input type="text" id="fbScore" placeholder="Счет" value="2:4" style="background:#1e293b; border:1px solid var(--border-color); color:#38bdf8; text-align:center; padding:4px; border-radius:4px; width:50px; font-size:11px; font-weight:bold;">
-            <input type="text" id="fbAway" placeholder="Гости" value="Академия Михайлова" style="background:#1e293b; border:1px solid var(--border-color); color:#fff; padding:4px; border-radius:4px; flex:1; font-size:11px;">
+          <span style="color:#fff; font-weight:bold; display:block; margin:6px 0;">Укажите данные матча для календаря:</span>
+          <div style="display:flex; gap:4px; margin-top:4px;">
+            <input type="text" id="fbHome" placeholder="Хозяева" value="Алмаз" style="background:#1e293b; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:4px; flex:1; font-size:11px;">
+            <input type="text" id="fbScore" placeholder="Счет" value="2:4" style="background:#1e293b; border:1px solid var(--border-color); color:#38bdf8; text-align:center; padding:6px; border-radius:4px; width:55px; font-size:12px; font-weight:bold;">
+            <input type="text" id="fbAway" placeholder="Гости" value="Академия Михайлова" style="background:#1e293b; border:1px solid var(--border-color); color:#fff; padding:6px; border-radius:4px; flex:1; font-size:11px;">
           </div>
-          <button class="btn-success" style="width:100%; justify-content:center; margin-top:6px;" onclick="saveFallbackMatch('${leagueName}')">
-            Сохранить в календарь
+          <button class="btn-success" style="width:100%; justify-content:center; margin-top:8px;" onclick="saveFallbackMatch('${leagueName}')">
+            Сохранить протокол и составы
           </button>
         </div>
       `;
@@ -1483,9 +1496,9 @@
   }
 
   function saveFallbackMatch(leagueName) {
-    const h = document.getElementById('fbHome')?.value.trim() || 'Хозяева';
-    const s = document.getElementById('fbScore')?.value.trim() || '— : —';
-    const a = document.getElementById('fbAway')?.value.trim() || 'Гости';
+    const h = document.getElementById('fbHome')?.value.trim() || 'Алмаз';
+    const s = document.getElementById('fbScore')?.value.trim() || '2:4';
+    const a = document.getElementById('fbAway')?.value.trim() || 'Академия Михайлова';
     
     const fallbackMatch = {
       league: leagueName,
@@ -1515,7 +1528,6 @@
     switchDayModalTab('matchView');
   }
 
-  // ОТРИСОВКА ПОЛНОЦЕННОЙ ТАБЛИЦЫ МАТЧА В ОКНЕ ДНЯ
   function renderFullMatchProtocol(data) {
     const container = document.getElementById('matchProtocolContent');
     if (!container) return;
@@ -1538,7 +1550,7 @@
           <button id="btnRosterHome" class="active" onclick="switchRosterTab('home')">${data.homeTeam}</button>
           <button id="btnRosterAway" onclick="switchRosterTab('away')">${data.awayTeam}</button>
         </div>
-        <span style="font-size:11px; color:var(--text-muted);"><i class="ph ph-cursor-click"></i> Нажмите на игрока для подробной статистики</span>
+        <span style="font-size:11px; color:var(--text-muted);"><i class="ph ph-cursor-click"></i> Нажмите на строку игрока для просмотра статистики</span>
       </div>
 
       <div style="background:#0f172a; border:1px solid var(--border-color); border-radius:8px; overflow-x:auto; margin-top:6px;">
@@ -1602,7 +1614,6 @@
     });
   }
 
-  // КАРТОЧКА СТАТИСТИКИ ИГРОКА
   function openPlayerModal(player, teamName, matchContext) {
     document.getElementById('pdmName').textContent = player.name;
     document.getElementById('pdmClubRole').textContent = `${teamName} • ${player.role}`;
@@ -1770,43 +1781,6 @@
     setTimeout(resizeCanvasToFit, 150);
   }
 
-  document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement) {
-      document.body.classList.remove('is-fullscreen');
-      closeContextPopover();
-      setTimeout(resizeCanvasToFit, 100);
-    } else {
-      document.body.classList.add('is-fullscreen');
-      setTimeout(resizeCanvasToFit, 100);
-    }
-  });
-
-  document.addEventListener('webkitfullscreenchange', () => {
-    if (!document.webkitFullscreenElement) {
-      document.body.classList.remove('is-fullscreen');
-      closeContextPopover();
-      setTimeout(resizeCanvasToFit, 100);
-    } else {
-      document.body.classList.add('is-fullscreen');
-      setTimeout(resizeCanvasToFit, 100);
-    }
-  });
-
-  document.addEventListener('pointerdown', (e) => {
-    if (!isIOS && document.body.classList.contains('is-fullscreen')) {
-      const popover = document.getElementById('globalPopoverMenu');
-      const sidebar = document.getElementById('mainSidebar');
-      if (popover && popover.classList.contains('active')) {
-        if (!popover.contains(e.target) && (!sidebar || !sidebar.contains(e.target))) {
-          setTimeout(closeContextPopover, 10);
-        }
-      }
-    }
-  });
-
-  document.getElementById('globalPopoverMenu').addEventListener('pointerdown', (e) => e.stopPropagation());
-  document.getElementById('globalPopoverMenu').addEventListener('click', (e) => e.stopPropagation());
-
   function handleScaleSliderChange(val) {
     globalObjectScale = parseFloat(val);
     document.getElementById('objectScaleLabel').textContent = `${globalObjectScale.toFixed(1)}x`;
@@ -1821,10 +1795,7 @@
           }
         });
       } else {
-        activeObj.set({
-          scaleX: globalObjectScale,
-          scaleY: globalObjectScale
-        });
+        activeObj.set({ scaleX: globalObjectScale, scaleY: globalObjectScale });
       }
       canvas.requestRenderAll();
       saveState();
@@ -1848,7 +1819,6 @@
   }
 
   window.addEventListener('resize', resizeCanvasToFit);
-  window.addEventListener('orientationchange', () => setTimeout(resizeCanvasToFit, 200));
 
   function createRealisticGoalObject(x, y, facingRight = true, isEquipment = false) {
     const h = 42;
@@ -1877,13 +1847,7 @@
   function lockBackgroundObjects() {
     canvas.forEachObject(obj => {
       if (obj.name === 'rink_bg' || obj.customType === 'rink_bg') {
-        obj.set({
-          selectable: false,
-          evented: false,
-          hasControls: false,
-          lockMovementX: true,
-          lockMovementY: true
-        });
+        obj.set({ selectable: false, evented: false, hasControls: false, lockMovementX: true, lockMovementY: true });
       }
     });
   }
@@ -1892,1378 +1856,8 @@
     currentRinkType = 'full';
     currentVirtualWidth = VIRTUAL_WIDTH_FULL;
     canvas.clear();
-    const w = VIRTUAL_WIDTH_FULL;
-    const h = VIRTUAL_HEIGHT;
-    const red = '#dc2626';
-    const blue = '#2563eb';
-
-    const base = new fabric.Rect({ left: 0, top: 0, width: w, height: h, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
-    const boards = new fabric.Rect({
-      left: 15, top: 15, width: w - 30, height: h - 30, fill: '#ffffff',
-      stroke: '#0284c7', strokeWidth: 4, rx: 55, ry: 55, selectable: false, evented: false, name: 'rink_bg'
-    });
-
-    const centerRed = new fabric.Line([w / 2, 15, w / 2, h - 15], { stroke: red, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
-    const blueL = new fabric.Line([w * 0.35, 15, w * 0.35, h - 15], { stroke: blue, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
-    const blueR = new fabric.Line([w * 0.65, 15, w * 0.65, h - 15], { stroke: blue, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
-
-    const centerCircle = new fabric.Circle({ left: w / 2, top: h / 2, originX: 'center', originY: 'center', radius: 78, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const centerDot = new fabric.Circle({ left: w / 2, top: h / 2, originX: 'center', originY: 'center', radius: 5, fill: blue, selectable: false, evented: false, name: 'rink_bg' });
-
-    const goalLineL = new fabric.Line([w * 0.10, 35, w * 0.10, h - 35], { stroke: red, strokeWidth: 3, selectable: false, evented: false, name: 'rink_bg' });
-    const goalLineR = new fabric.Line([w * 0.92, 35, w * 0.92, h - 35], { stroke: red, strokeWidth: 3, selectable: false, evented: false, name: 'rink_bg' });
-
-    const creaseL = new fabric.Circle({ left: w * 0.10, top: h / 2, originX: 'center', originY: 'center', radius: 22, startAngle: -Math.PI / 2, endAngle: Math.PI / 2, stroke: red, strokeWidth: 2, fill: 'rgba(56, 189, 248, 0.25)', selectable: false, evented: false, name: 'rink_bg' });
-    const creaseR = new fabric.Circle({ left: w * 0.92, top: h / 2, originX: 'center', originY: 'center', radius: 22, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2, stroke: red, strokeWidth: 2, fill: 'rgba(56, 189, 248, 0.25)', selectable: false, evented: false, name: 'rink_bg' });
-
-    const trapLineL1 = new fabric.Line([w * 0.10, h * 0.40, 18, h * 0.34], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLineL2 = new fabric.Line([w * 0.10, h * 0.60, 18, h * 0.66], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLineR1 = new fabric.Line([w * 0.92, h * 0.40, w - 18, h * 0.34], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLineR2 = new fabric.Line([w * 0.92, h * 0.60, w - 18, h * 0.66], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-
-    const fixedGoalL = createRealisticGoalObject(w * 0.10, h / 2, true, false);
-    const fixedGoalR = createRealisticGoalObject(w * 0.92, h / 2, false, false);
-
-    canvas.add(base, boards, centerRed, blueL, blueR, centerCircle, centerDot, goalLineL, goalLineR, creaseL, creaseR, trapLineL1, trapLineL2, trapLineR1, trapLineR2, fixedGoalL, fixedGoalR);
-
-    const faceoffX1 = w * 0.22, faceoffX2 = w * 0.78, faceoffY1 = h * 0.28, faceoffY2 = h * 0.72;
-    [{ x: faceoffX1, y: faceoffY1 }, { x: faceoffX1, y: faceoffY2 }, { x: faceoffX2, y: faceoffY1 }, { x: faceoffX2, y: faceoffY2 }].forEach(pt => drawFaceoffCircle(pt.x, pt.y, red));
-
-    const neutralX1 = w * 0.38, neutralX2 = w * 0.62;
-    [{ x: neutralX1, y: h * 0.32 }, { x: neutralX1, y: h * 0.68 }, { x: neutralX2, y: h * 0.32 }, { x: neutralX2, y: h * 0.68 }].forEach(pt => {
-      canvas.add(new fabric.Circle({ left: pt.x, top: pt.y, originX: 'center', originY: 'center', radius: 4.5, fill: red, selectable: false, evented: false, name: 'rink_bg' }));
-    });
-
-    drawBenchesAndPenaltyBoxes(w, h);
-
-    if (tracingObject) canvas.add(tracingObject);
-
-    lockBackgroundObjects();
-    resizeCanvasToFit();
-    saveState();
-  }
-
-  function drawBenchesAndPenaltyBoxes(w, h) {
-    const benchColor = '#94a3b8';
-    canvas.add(new fabric.Rect({ left: w * 0.38, top: 11, width: w * 0.08, height: 6, fill: benchColor, selectable: false, evented: false, name: 'rink_bg' }));
-    canvas.add(new fabric.Rect({ left: w * 0.54, top: 11, width: w * 0.08, height: 6, fill: benchColor, selectable: false, evented: false, name: 'rink_bg' }));
-    canvas.add(new fabric.Rect({ left: w * 0.42, top: h - 17, width: w * 0.06, height: 6, fill: benchColor, selectable: false, evented: false, name: 'rink_bg' }));
-    canvas.add(new fabric.Rect({ left: w * 0.50, top: h - 17, width: w * 0.04, height: 6, fill: '#ef4444', selectable: false, evented: false, name: 'rink_bg' }));
-    canvas.add(new fabric.Rect({ left: w * 0.55, top: h - 17, width: w * 0.06, height: 6, fill: benchColor, selectable: false, evented: false, name: 'rink_bg' }));
-  }
-
-  function drawFaceoffCircle(cx, cy, color) {
-    const r = 48;
-    const circle = new fabric.Circle({ left: cx, top: cy, originX: 'center', originY: 'center', radius: r, fill: 'transparent', stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const dot = new fabric.Circle({ left: cx, top: cy, originX: 'center', originY: 'center', radius: 4.5, fill: color, selectable: false, evented: false, name: 'rink_bg' });
-    const h1 = new fabric.Line([cx - 12, cy - r - 4, cx - 12, cy - r + 4], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const h2 = new fabric.Line([cx + 12, cy - r - 4, cx + 12, cy - r + 4], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const h3 = new fabric.Line([cx - 12, cy + r - 4, cx - 12, cy + r + 4], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const h4 = new fabric.Line([cx + 12, cy + r - 4, cx + 12, cy + r + 4], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    canvas.add(circle, dot, h1, h2, h3, h4);
-  }
-
-  function drawHalfIce() {
-    currentRinkType = 'half';
-    currentVirtualWidth = VIRTUAL_WIDTH_HALF;
-    canvas.clear();
-    const wHalf = VIRTUAL_WIDTH_HALF;
-    const h = VIRTUAL_HEIGHT;
-    const red = '#dc2626';
-    const blue = '#2563eb';
-
-    const base = new fabric.Rect({ left: 0, top: 0, width: wHalf, height: h, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
-    const boardsHalfPath = `M ${wHalf} 15 L 65 15 A 50 50 0 0 0 15 65 L 15 ${h - 65} A 50 50 0 0 0 65 ${h - 15} L ${wHalf} ${h - 15} Z`;
-    const boards = new fabric.Path(boardsHalfPath, {
-      fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, selectable: false, evented: false, name: 'rink_bg'
-    });
-
-    const centerRed = new fabric.Line([wHalf, 15, wHalf, h - 15], { stroke: red, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
-
-    const centerCircleHalf = new fabric.Circle({
-      left: wHalf, top: h / 2, originX: 'center', originY: 'center',
-      radius: 78, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2,
-      fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg'
-    });
-    const centerDotHalf = new fabric.Circle({
-      left: wHalf, top: h / 2, originX: 'center', originY: 'center',
-      radius: 5, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2,
-      fill: blue, selectable: false, evented: false, name: 'rink_bg'
-    });
-
-    const blueX = VIRTUAL_WIDTH_FULL * 0.35;
-    const blueLine = new fabric.Line([blueX, 15, blueX, h - 15], { stroke: blue, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
-
-    const neutralX = VIRTUAL_WIDTH_FULL * 0.38;
-    const neutralDot1 = new fabric.Circle({ left: neutralX, top: h * 0.32, originX: 'center', originY: 'center', radius: 4.5, fill: red, selectable: false, evented: false, name: 'rink_bg' });
-    const neutralDot2 = new fabric.Circle({ left: neutralX, top: h * 0.68, originX: 'center', originY: 'center', radius: 4.5, fill: red, selectable: false, evented: false, name: 'rink_bg' });
-
-    const goalLineX = VIRTUAL_WIDTH_FULL * 0.10;
-    const goalLine = new fabric.Line([goalLineX, 35, goalLineX, h - 35], { stroke: red, strokeWidth: 3, selectable: false, evented: false, name: 'rink_bg' });
-    const crease = new fabric.Circle({
-      left: goalLineX, top: h / 2, originX: 'center', originY: 'center',
-      radius: 22, startAngle: -Math.PI / 2, endAngle: Math.PI / 2,
-      stroke: red, strokeWidth: 2, fill: 'rgba(56, 189, 248, 0.25)', selectable: false, evented: false, name: 'rink_bg'
-    });
-
-    const trapLine1 = new fabric.Line([goalLineX, h * 0.40, 18, h * 0.34], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLine2 = new fabric.Line([goalLineX, h * 0.60, 18, h * 0.66], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-
-    const fixedGoal = createRealisticGoalObject(goalLineX, h / 2, true, false);
-
-    canvas.add(base, boards, centerRed, centerCircleHalf, centerDotHalf, blueLine, neutralDot1, neutralDot2, goalLine, crease, trapLine1, trapLine2, fixedGoal);
-
-    const faceoffX = VIRTUAL_WIDTH_FULL * 0.22;
-    drawFaceoffCircle(faceoffX, h * 0.28, red);
-    drawFaceoffCircle(faceoffX, h * 0.72, red);
-
-    if (tracingObject) canvas.add(tracingObject);
-
-    lockBackgroundObjects();
-    resizeCanvasToFit();
-    saveState();
-  }
-
-  function setRinkPreset(type) {
-    document.getElementById('btnFullRink').classList.toggle('active', type === 'full');
-    document.getElementById('btnHalfRink').classList.toggle('active', type === 'half');
-    if (type === 'full') drawFullIce();
-    else drawHalfIce();
-  }
-
-  function uploadCustomBg(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(f) {
-      fabric.Image.fromURL(f.target.result, function(img) {
-        canvas.clear();
-        const isHalf = (img.width / img.height < 1.4);
-        currentVirtualWidth = isHalf ? VIRTUAL_WIDTH_HALF : VIRTUAL_WIDTH_FULL;
-        img.scaleToWidth(currentVirtualWidth);
-        img.scaleToHeight(VIRTUAL_HEIGHT);
-        img.set({ selectable: false, evented: false, name: 'rink_bg' });
-        canvas.add(img);
-        if (tracingObject) canvas.add(tracingObject);
-        currentRinkType = isHalf ? 'half' : 'full';
-        document.getElementById('btnFullRink').classList.toggle('active', !isHalf);
-        document.getElementById('btnHalfRink').classList.toggle('active', isHalf);
-        lockBackgroundObjects();
-        resizeCanvasToFit();
-        saveState();
-      });
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function openTracingUploader() {
-    if (tracingObject) {
-      toggleTracingPanel(true);
-      return;
-    }
-    document.getElementById('tracingFileInput').click();
-  }
-
-  function handleTracingUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      fabric.Image.fromURL(event.target.result, function(img) {
-        if (tracingObject) {
-          canvas.remove(tracingObject);
-        }
-
-        const maxW = currentVirtualWidth * 0.85;
-        if (img.width > maxW) {
-          img.scaleToWidth(maxW);
-        }
-
-        img.set({
-          left: currentVirtualWidth / 2,
-          top: VIRTUAL_HEIGHT / 2,
-          originX: 'center',
-          originY: 'center',
-          opacity: 0.45,
-          transparentCorners: false,
-          cornerColor: '#38bdf8',
-          cornerStrokeColor: '#ffffff',
-          borderColor: '#38bdf8',
-          cornerSize: 10,
-          name: 'tracing_layer',
-          selectable: true,
-          hasControls: true
-        });
-
-        tracingObject = img;
-        canvas.add(tracingObject);
-        canvas.setActiveObject(tracingObject);
-
-        toggleTracingPanel(true);
-        canvas.renderAll();
-        e.target.value = '';
-      });
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function toggleTracingPanel(show) {
-    const panel = document.getElementById('tracingFloatingBar');
-    if (show) {
-      panel.classList.add('active');
-    } else {
-      panel.classList.remove('active');
-    }
-  }
-
-  function updateTracingOpacity(val) {
-    if (!tracingObject) return;
-    tracingObject.set('opacity', parseFloat(val));
-    document.getElementById('tracingOpacityValue').textContent = `${Math.round(val * 100)}%`;
-    canvas.renderAll();
-  }
-
-  function toggleTracingLock() {
-    if (!tracingObject) return;
-    isTracingLocked = !isTracingLocked;
-    const btn = document.getElementById('btnLockTracing');
-
-    tracingObject.set({
-      selectable: !isTracingLocked,
-      evented: !isTracingLocked
-    });
-
-    if (isTracingLocked) {
-      canvas.discardActiveObject();
-      btn.innerHTML = '<i class="ph ph-lock-key-open"></i> Открепить';
-      btn.style.background = '#0284c7';
-    } else {
-      canvas.setActiveObject(tracingObject);
-      btn.innerHTML = '<i class="ph ph-lock-key"></i> Закрепить';
-      btn.style.background = '#1e293b';
-    }
-    canvas.renderAll();
-  }
-
-  function removeTracing() {
-    if (!tracingObject) return;
-    canvas.remove(tracingObject);
-    tracingObject = null;
-    isTracingLocked = false;
-    toggleTracingPanel(false);
-    document.getElementById('btnLockTracing').innerHTML = '<i class="ph ph-lock-key"></i> Закрепить';
-    canvas.renderAll();
-  }
-
-  function getNextPlayerNumber(role) {
-    let count = 0;
-    canvas.forEachObject(obj => {
-      if (obj.customType === 'player' && obj.playerRole === role) count++;
-    });
-    return count + 1;
-  }
-
-  function renumberPlayers(role) {
-    let counter = 1;
-    canvas.forEachObject(obj => {
-      if (obj.customType === 'player' && obj.playerRole === role) {
-        obj.playerNumber = counter;
-        const textObj = obj.item(1);
-        if (textObj) textObj.set('text', `${role}${counter}`);
-        counter++;
-      }
-    });
-    canvas.requestRenderAll();
-  }
-
-  function preparePlacement(type, options = {}, btnElement = null) {
-    placementItem = { type, options };
-    setTool('placement');
-
-    document.querySelectorAll('.place-btn').forEach(b => b.classList.remove('active'));
-    if (btnElement) btnElement.classList.add('active');
-
-    const hint = document.getElementById('hintBar');
-    if (type === 'player') hint.textContent = `Кликайте по полю для добавления ${options.role}. Нажмите Выбор для завершения.`;
-    else if (type === 'coach') hint.textContent = 'Кликайте по полю для добавления Тренера (C).';
-    else if (type === 'cross') hint.textContent = 'Кликайте по полю для расстановки крестиков (✕).';
-    else if (type === 'ring') hint.textContent = 'Кликайте по полю для расстановки полых кружков (○).';
-    else if (type === 'puck') hint.textContent = 'Кликайте по полю для добавления шайб.';
-    else if (type === 'cone') hint.textContent = 'Кликайте по полю для расстановки конусов.';
-    else if (type === 'goal') hint.textContent = 'Кликните для установки ворот на поле.';
-    else if (type === 'text') hint.textContent = 'Кликните на поле для добавления текста инструкции.';
-  }
-
-  function executePlacement(pointer) {
-    if (!placementItem) return;
-    const { type, options } = placementItem;
-
-    if (type === 'player') {
-      const num = getNextPlayerNumber(options.role);
-      const circle = new fabric.Circle({
-        radius: 14, fill: options.color, stroke: '#ffffff', strokeWidth: 2, originX: 'center', originY: 'center'
-      });
-      const txt = new fabric.Text(`${options.role}${num}`, {
-        fontSize: 12, fill: '#ffffff', fontWeight: 'bold', originX: 'center', originY: 'center', fontFamily: 'sans-serif'
-      });
-      const player = new fabric.Group([circle, txt], {
-        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
-        scaleX: globalObjectScale, scaleY: globalObjectScale,
-        selectable: true, hasControls: true, customType: 'player',
-        playerRole: options.role, playerNumber: num
-      });
-      canvas.add(player);
-
-    } else if (type === 'coach') {
-      const num = getNextPlayerNumber('C');
-      const circle = new fabric.Circle({
-        radius: 14, fill: '#0f172a', stroke: '#ffffff', strokeWidth: 2, originX: 'center', originY: 'center'
-      });
-      const txt = new fabric.Text(num > 1 ? `C${num}` : 'C', {
-        fontSize: 13, fill: '#ffffff', fontWeight: 'bold', originX: 'center', originY: 'center', fontFamily: 'sans-serif'
-      });
-      const coach = new fabric.Group([circle, txt], {
-        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
-        scaleX: globalObjectScale, scaleY: globalObjectScale,
-        selectable: true, hasControls: true, customType: 'player',
-        playerRole: 'C', playerNumber: num
-      });
-      canvas.add(coach);
-
-    } else if (type === 'cross') {
-      const size = 11;
-      const line1 = new fabric.Line([-size, -size, size, size], {
-        stroke: currentColor, strokeWidth: 3.2, strokeLineCap: 'round'
-      });
-      const line2 = new fabric.Line([-size, size, size, -size], {
-        stroke: currentColor, strokeWidth: 3.2, strokeLineCap: 'round'
-      });
-      const cross = new fabric.Group([line1, line2], {
-        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
-        scaleX: globalObjectScale, scaleY: globalObjectScale,
-        selectable: true, hasControls: true, customType: 'equipment'
-      });
-      canvas.add(cross);
-
-    } else if (type === 'ring') {
-      const ring = new fabric.Circle({
-        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
-        radius: 11, fill: 'transparent', stroke: currentColor, strokeWidth: 3,
-        scaleX: globalObjectScale, scaleY: globalObjectScale,
-        selectable: true, hasControls: true, customType: 'equipment'
-      });
-      canvas.add(ring);
-
-    } else if (type === 'puck') {
-      const puck = new fabric.Circle({
-        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
-        radius: 7, fill: '#000000', stroke: '#ffffff', strokeWidth: 1.5,
-        scaleX: globalObjectScale, scaleY: globalObjectScale,
-        selectable: true, customType: 'equipment'
-      });
-      canvas.add(puck);
-
-    } else if (type === 'cone') {
-      const cone = new fabric.Triangle({
-        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
-        width: 18, height: 20, fill: '#ea580c', stroke: '#ffffff', strokeWidth: 1.5,
-        scaleX: globalObjectScale, scaleY: globalObjectScale,
-        selectable: true, customType: 'equipment'
-      });
-      canvas.add(cone);
-
-    } else if (type === 'goal') {
-      const goal = createRealisticGoalObject(pointer.x, pointer.y, true, true);
-      goal.set({
-        selectable: true,
-        evented: true,
-        hasControls: true,
-        lockMovementX: false,
-        lockMovementY: false,
-        scaleX: globalObjectScale,
-        scaleY: globalObjectScale
-      });
-      canvas.add(goal);
-
-    } else if (type === 'text') {
-      const text = new fabric.IText('Задание на тренировку', {
-        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
-        fontSize: Math.round(15 * globalObjectScale), fill: currentColor, backgroundColor: 'rgba(255,255,255,0.9)',
-        padding: 5, customType: 'annotation'
-      });
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      setTool('select');
-      saveState();
-      return;
-    }
-    saveState();
-  }
-
-  function getPolylineMetrics(points) {
-    let totalLen = 0;
-    const segLens = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const d = Math.hypot(points[i+1].x - points[i].x, points[i+1].y - points[i].y);
-      segLens.push(d);
-      totalLen += d;
-    }
-    return { totalLen, segLens };
-  }
-
-  function getPointAlongPath(points, segLens, totalLen, dist) {
-    if (dist <= 0) {
-      const p1 = points[0], p2 = points[1] || points[0];
-      const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
-      return { pt: points[0], tangent: { nx: -dy / len, ny: dx / len, dx: dx / len, dy: dy / len } };
-    }
-    if (dist >= totalLen) {
-      const p1 = points[points.length - 2] || points[0], p2 = points[points.length - 1];
-      const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
-      return { pt: p2, tangent: { nx: -dy / len, ny: dx / len, dx: dx / len, dy: dy / len } };
-    }
-    let accum = 0;
-    for (let i = 0; i < segLens.length; i++) {
-      if (accum + segLens[i] >= dist) {
-        const segDist = dist - accum;
-        const ratio = segLens[i] === 0 ? 0 : segDist / segLens[i];
-        const p1 = points[i], p2 = points[i + 1];
-        const bx = p1.x + (p2.x - p1.x) * ratio;
-        const by = p1.y + (p2.y - p1.y) * ratio;
-        const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
-        return { pt: { x: bx, y: by }, tangent: { nx: -dy / len, ny: dx / len, dx: dx / len, dy: dy / len } };
-      }
-      accum += segLens[i];
-    }
-    return { pt: points[points.length - 1], tangent: { nx: 0, ny: 0, dx: 1, dy: 0 } };
-  }
-
-  function generateHockeyTacticalSVG(points, pattern) {
-    if (points.length < 2) return { svg: '', dots: [] };
-    const { totalLen, segLens } = getPolylineMetrics(points);
-    if (totalLen < 5) return { svg: `M ${points[0].x} ${points[0].y} L ${points[points.length-1].x} ${points[points.length-1].y}`, dots: [] };
-
-    if (pattern === 'forward') {
-      return { svg: generateSmoothSVGPath(points), dots: [] };
-    }
-
-    if (pattern === 'forward_puck') {
-      const wavelength = 18 * globalObjectScale;
-      const amplitude = 5.5 * globalObjectScale;
-      const steps = Math.max(12, Math.floor(totalLen / 2));
-      let svg = '';
-      for (let s = 0; s <= steps; s++) {
-        const d = (s / steps) * totalLen;
-        const { pt, tangent } = getPointAlongPath(points, segLens, totalLen, d);
-        const wave = Math.sin((d / wavelength) * Math.PI * 2) * amplitude;
-        const fx = pt.x + tangent.nx * wave;
-        const fy = pt.y + tangent.ny * wave;
-        svg += (s === 0) ? `M ${fx.toFixed(1)} ${fy.toFixed(1)} ` : `L ${fx.toFixed(1)} ${fy.toFixed(1)} `;
-      }
-      return { svg, dots: [] };
-    }
-
-    if (pattern === 'backward' || pattern === 'backward_puck') {
-      const arcLen = 11 * globalObjectScale;
-      const gap = 2.5 * globalObjectScale;
-      const step = arcLen + gap;
-      const count = Math.max(1, Math.floor(totalLen / step));
-      const offsetFromCenter = 3.5 * globalObjectScale;
-      const arcHeight = 5.5 * globalObjectScale;
-
-      let svg = '';
-      const puckDots = [];
-
-      for (let i = 0; i < count; i++) {
-        const dStart = i * step;
-        const dEnd = dStart + arcLen;
-        if (dEnd > totalLen) break;
-
-        const side = (i % 2 === 0) ? 1 : -1;
-        const p1 = getPointAlongPath(points, segLens, totalLen, dStart);
-        const p2 = getPointAlongPath(points, segLens, totalLen, dEnd);
-        const dMid = (dStart + dEnd) / 2;
-        const pMid = getPointAlongPath(points, segLens, totalLen, dMid);
-
-        const sx = p1.pt.x + p1.tangent.nx * (offsetFromCenter * side);
-        const sy = p1.pt.y + p1.tangent.ny * (offsetFromCenter * side);
-        const ex = p2.pt.x + p2.tangent.nx * (offsetFromCenter * side);
-        const ey = p2.pt.y + p2.tangent.ny * (offsetFromCenter * side);
-        const mx = pMid.pt.x + pMid.tangent.nx * ((offsetFromCenter + arcHeight) * side);
-        const my = pMid.pt.y + pMid.tangent.ny * ((offsetFromCenter + arcHeight) * side);
-
-        svg += `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)} `;
-
-        if (pattern === 'backward_puck') {
-          const dPuck = dEnd + gap / 2;
-          if (dPuck < totalLen) {
-            const puckPos = getPointAlongPath(points, segLens, totalLen, dPuck);
-            puckDots.push({ x: puckPos.pt.x, y: puckPos.pt.y });
-          }
-        }
-      }
-      return { svg, dots: puckDots };
-    }
-
-    if (pattern === 'lateral') {
-      let svg = generateSmoothSVGPath(points);
-      const stepDist = 9 * globalObjectScale;
-      const barLen = 5.5 * globalObjectScale;
-      for (let d = 4; d < totalLen - 4; d += stepDist) {
-        const { pt, tangent } = getPointAlongPath(points, segLens, totalLen, d);
-        const x1 = pt.x - tangent.nx * barLen;
-        const y1 = pt.y - tangent.ny * barLen;
-        const x2 = pt.x + tangent.nx * barLen;
-        const y2 = pt.y + tangent.ny * barLen;
-        svg += ` M ${x1.toFixed(1)} ${y1.toFixed(1)} L ${x2.toFixed(1)} ${y2.toFixed(1)} `;
-      }
-      return { svg, dots: [] };
-    }
-
-    if (pattern === 'butterfly') {
-      const loopLen = 14 * globalObjectScale;
-      const count = Math.max(2, Math.floor(totalLen / loopLen));
-      let svg = '';
-      for (let i = 0; i < count; i++) {
-        const d1 = (i / count) * totalLen;
-        const d2 = ((i + 1) / count) * totalLen;
-        const p1 = getPointAlongPath(points, segLens, totalLen, d1);
-        const p2 = getPointAlongPath(points, segLens, totalLen, d2);
-        const midD = (d1 + d2) / 2;
-        const pMid = getPointAlongPath(points, segLens, totalLen, midD);
-        const span = 4.5 * globalObjectScale;
-        svg += `M ${p1.pt.x.toFixed(1)} ${p1.pt.y.toFixed(1)} Q ${(pMid.pt.x + pMid.tangent.nx * span).toFixed(1)} ${(pMid.pt.y + pMid.tangent.ny * span).toFixed(1)} ${p2.pt.x.toFixed(1)} ${p2.pt.y.toFixed(1)} `;
-        svg += `M ${p1.pt.x.toFixed(1)} ${p1.pt.y.toFixed(1)} Q ${(pMid.pt.x - pMid.tangent.nx * span).toFixed(1)} ${(pMid.pt.y - pMid.tangent.ny * span).toFixed(1)} ${p2.pt.x.toFixed(1)} ${p2.pt.y.toFixed(1)} `;
-      }
-      return { svg, dots: [] };
-    }
-
-    if (pattern === 'shooting') {
-      const gap = 3 * globalObjectScale;
-      const steps = Math.max(10, Math.floor(totalLen / 4));
-      let line1 = '', line2 = '';
-      for (let s = 0; s <= steps; s++) {
-        const d = (s / steps) * totalLen;
-        const { pt, tangent } = getPointAlongPath(points, segLens, totalLen, d);
-        const x1 = pt.x + tangent.nx * gap;
-        const y1 = pt.y + tangent.ny * gap;
-        const x2 = pt.x - tangent.nx * gap;
-        const y2 = pt.y - tangent.ny * gap;
-        line1 += (s === 0) ? `M ${x1.toFixed(1)} ${y1.toFixed(1)} ` : `L ${x1.toFixed(1)} ${y1.toFixed(1)} `;
-        line2 += (s === 0) ? `M ${x2.toFixed(1)} ${y2.toFixed(1)} ` : `L ${x2.toFixed(1)} ${y2.toFixed(1)} `;
-      }
-      return { svg: line1 + line2, dots: [] };
-    }
-
-    return { svg: generateSmoothSVGPath(points), dots: [] };
-  }
-
-  function generateSmoothSVGPath(rawPts) {
-    const pts = [rawPts[0]];
-    for (let i = 1; i < rawPts.length; i++) {
-      const dist = Math.hypot(rawPts[i].x - pts[pts.length - 1].x, rawPts[i].y - pts[pts.length - 1].y);
-      if (dist > 4) pts.push(rawPts[i]);
-    }
-    if (pts.length < 3) {
-      return `M ${rawPts[0].x} ${rawPts[0].y} L ${rawPts[rawPts.length-1].x} ${rawPts[rawPts.length-1].y}`;
-    }
-    let d = `M ${pts[0].x} ${pts[0].y} `;
-    for (let i = 1; i < pts.length - 1; i++) {
-      const midX = (pts[i].x + pts[i + 1].x) / 2;
-      const midY = (pts[i].y + pts[i + 1].y) / 2;
-      d += `Q ${pts[i].x} ${pts[i].y}, ${midX} ${midY} `;
-    }
-    d += `L ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`;
-    return d;
-  }
-
-  function createTacticalEnding(x, y, angle) {
-    if (currentEnding === 'none') return null;
-
-    if (currentEnding === 'arrow') {
-      const sz = 10 * globalObjectScale;
-      const arrowPath = `M ${-sz} ${-sz * 0.9} L ${sz * 0.2} 0 L ${-sz} ${sz * 0.9}`;
-      return new fabric.Path(arrowPath, {
-        left: x, top: y, originX: 'center', originY: 'center',
-        fill: 'transparent', stroke: currentColor,
-        strokeWidth: strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round',
-        angle: angle
-      });
-    }
-
-    if (currentEnding === 'stop') {
-      const barHeight = 18 * globalObjectScale;
-      const barGap = 4 * globalObjectScale;
-      const bar1 = new fabric.Line([-barGap, -barHeight / 2, -barGap, barHeight / 2], {
-        stroke: currentColor, strokeWidth: strokeWidth, strokeLineCap: 'round'
-      });
-      const bar2 = new fabric.Line([barGap, -barHeight / 2, barGap, barHeight / 2], {
-        stroke: currentColor, strokeWidth: strokeWidth, strokeLineCap: 'round'
-      });
-      return new fabric.Group([bar1, bar2], {
-        left: x, top: y, originX: 'center', originY: 'center', angle: angle
-      });
-    }
-
-    if (currentEnding === 'dot') {
-      return new fabric.Circle({
-        left: x, top: y, originX: 'center', originY: 'center',
-        radius: 6 * globalObjectScale, fill: currentColor
-      });
-    }
-
-    const basePivotPath = "M 0 0 C 14 0, 20 18, 10 24 C 0 30, -8 22, -8 14 M -13 18 L -8 13 L -3 18";
-
-    if (currentEnding === 'right_pivot') {
-      const pathObj = new fabric.Path(basePivotPath, {
-        fill: 'transparent', stroke: currentColor,
-        strokeWidth: strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round',
-        scaleX: globalObjectScale, scaleY: globalObjectScale
-      });
-      return new fabric.Group([pathObj], {
-        left: x, top: y, originX: 'left', originY: 'top',
-        angle: angle
-      });
-    }
-
-    if (currentEnding === 'left_pivot') {
-      const pathObj = new fabric.Path(basePivotPath, {
-        fill: 'transparent', stroke: currentColor,
-        strokeWidth: strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round',
-        scaleX: globalObjectScale, scaleY: -globalObjectScale
-      });
-      return new fabric.Group([pathObj], {
-        left: x, top: y, originX: 'left', originY: 'bottom',
-        angle: angle
-      });
-    }
-
-    return null;
-  }
-
-  function getStrokeDashForPattern(pat) {
-    if (pat === 'passing') return [8 * globalObjectScale, 6 * globalObjectScale];
-    if (pat === 'pucks_line') return [3 * globalObjectScale, 8 * globalObjectScale];
-    return null;
-  }
-
-  function setupCanvasEvents() {
-    canvas.on('mouse:down', (opt) => {
-      const p = canvas.getPointer(opt.e);
-
-      if (currentTool === 'placement') {
-        executePlacement(p);
-        return;
-      }
-
-      if (currentTool === 'eraser') {
-        if (opt.target && opt.target.name !== 'rink_bg' && opt.target !== tracingObject) {
-          const removedRole = opt.target.playerRole;
-          canvas.remove(opt.target);
-          if (removedRole) renumberPlayers(removedRole);
-          saveState();
-        }
-        return;
-      }
-
-      isMouseDown = true;
-
-      if (currentTool === 'brush') {
-        rawPoints = [{ x: p.x, y: p.y }];
-        livePreviewLine = new fabric.Polyline([...rawPoints], {
-          stroke: currentColor,
-          strokeWidth: (currentPattern === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
-          strokeDashArray: getStrokeDashForPattern(currentPattern),
-          fill: 'transparent',
-          strokeLineCap: 'round',
-          strokeLineJoin: 'round',
-          selectable: false,
-          evented: false,
-          objectCaching: false
-        });
-        canvas.add(livePreviewLine);
-      } else if (currentTool === 'straightArrow') {
-        straightLine = new fabric.Line([p.x, p.y, p.x, p.y], {
-          stroke: currentColor,
-          strokeWidth: (currentPattern === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
-          strokeDashArray: getStrokeDashForPattern(currentPattern),
-          selectable: false,
-          evented: false,
-          objectCaching: false
-        });
-        canvas.add(straightLine);
-      }
-    });
-
-    canvas.on('mouse:move', (opt) => {
-      if (!isMouseDown) return;
-      const p = canvas.getPointer(opt.e);
-
-      if (currentTool === 'brush' && livePreviewLine) {
-        rawPoints.push({ x: p.x, y: p.y });
-        livePreviewLine.points = [...rawPoints];
-        livePreviewLine._setPositionDimensions({});
-        canvas.requestRenderAll();
-      } else if (currentTool === 'straightArrow' && straightLine) {
-        straightLine.set({ x2: p.x, y2: p.y });
-        canvas.requestRenderAll();
-      }
-    });
-
-    canvas.on('mouse:up', () => {
-      if (!isMouseDown) return;
-      isMouseDown = false;
-
-      if (currentTool === 'brush' && livePreviewLine) {
-        canvas.remove(livePreviewLine);
-        livePreviewLine = null;
-
-        if (rawPoints.length > 2) {
-          const { svg, dots } = generateHockeyTacticalSVG(rawPoints, currentPattern);
-          const finalPath = new fabric.Path(svg, {
-            stroke: currentColor,
-            strokeWidth: (currentPattern === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
-            strokeDashArray: getStrokeDashForPattern(currentPattern),
-            fill: 'transparent',
-            strokeLineCap: 'round',
-            strokeLineJoin: 'round'
-          });
-
-          const items = [finalPath];
-          dots.forEach(d => {
-            items.push(new fabric.Circle({
-              left: d.x, top: d.y, radius: 2.6 * globalObjectScale, fill: currentColor, originX: 'center', originY: 'center'
-            }));
-          });
-
-          const lastPt = rawPoints[rawPoints.length - 1];
-          const sampleBack = Math.max(0, rawPoints.length - 5);
-          const prevPt = rawPoints[sampleBack];
-          const angle = Math.atan2(lastPt.y - prevPt.y, lastPt.x - prevPt.x) * (180 / Math.PI);
-          const marker = createTacticalEnding(lastPt.x, lastPt.y, angle);
-
-          if (marker) items.push(marker);
-
-          const group = new fabric.Group(items, {
-            selectable: (currentTool === 'select'),
-            hasControls: true,
-            customType: 'tactical_trajectory'
-          });
-          canvas.add(group);
-          saveState();
-        }
-      } else if (currentTool === 'straightArrow' && straightLine) {
-        const x1 = straightLine.x1, y1 = straightLine.y1, x2 = straightLine.x2, y2 = straightLine.y2;
-        canvas.remove(straightLine);
-        straightLine = null;
-
-        if (Math.hypot(x2 - x1, y2 - y1) > 8) {
-          const pts = [{ x: x1, y: y1 }, { x: x2, y: y2 }];
-          const { svg, dots } = generateHockeyTacticalSVG(pts, currentPattern);
-          const lineObj = new fabric.Path(svg, {
-            stroke: currentColor,
-            strokeWidth: (currentPattern === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
-            strokeDashArray: getStrokeDashForPattern(currentPattern),
-            fill: 'transparent',
-            strokeLineCap: 'round',
-            strokeLineJoin: 'round'
-          });
-
-          const items = [lineObj];
-          dots.forEach(d => {
-            items.push(new fabric.Circle({
-              left: d.x, top: d.y, radius: 2.6 * globalObjectScale, fill: currentColor, originX: 'center', originY: 'center'
-            }));
-          });
-
-          const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
-          const marker = createTacticalEnding(x2, y2, angle);
-
-          if (marker) items.push(marker);
-          const group = new fabric.Group(items, {
-            selectable: (currentTool === 'select'),
-            hasControls: true,
-            customType: 'tactical_trajectory'
-          });
-          canvas.add(group);
-          saveState();
-        }
-      }
-    });
-  }
-
-  function deleteActiveObject() {
-    const activeObj = canvas.getActiveObject();
-    if (activeObj && !activeObj.isEditing && activeObj.name !== 'rink_bg') {
-      if (activeObj === tracingObject) {
-        removeTracing();
-        return;
-      }
-      const removedRole = activeObj.playerRole;
-      canvas.remove(activeObj);
-      if (removedRole) renumberPlayers(removedRole);
-      saveState();
-    }
-  }
-
-  function setupKeyEvents() {
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        setTool('select');
-        closeContextPopover();
-      }
-      if (e.key === 'Delete' || e.key === 'Backspace') deleteActiveObject();
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        redo();
-      }
-    });
-  }
-
-  function setTool(tool) {
-    currentTool = tool;
-    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-    if (tool !== 'placement') {
-      document.querySelectorAll('.place-btn').forEach(b => b.classList.remove('active'));
-      placementItem = null;
-    }
-
-    const idMap = { select: 'toolSelect', brush: 'toolBrush', straightArrow: 'toolStraightArrow', eraser: 'toolEraser' };
-    if (idMap[tool]) document.getElementById(idMap[tool]).classList.add('active');
-
-    const hint = document.getElementById('hintBar');
-    if (tool === 'select') hint.textContent = 'Режим выбора: перемещение, вращение и масштабирование';
-    else if (tool === 'brush') hint.textContent = 'Кисть: рисуйте тактическую траекторию на льду';
-    else if (tool === 'straightArrow') hint.textContent = 'Прямая: протяните линию от точки к точке';
-    else if (tool === 'eraser') hint.textContent = 'Ластик: кликните на объект для удаления';
-
-    canvas.selection = (tool === 'select');
-    canvas.discardActiveObject();
-    canvas.forEachObject(obj => {
-      if (obj.name !== 'rink_bg' && obj !== tracingObject) {
-        obj.selectable = (tool === 'select');
-        obj.evented = (tool === 'select' || tool === 'eraser');
-      }
-    });
-
-    if (tracingObject && !isTracingLocked) {
-      tracingObject.selectable = (tool === 'select');
-      tracingObject.evented = (tool === 'select');
-    }
-
-    canvas.defaultCursor = (tool === 'select') ? 'default' : 'crosshair';
-    lockBackgroundObjects();
-    canvas.requestRenderAll();
-  }
-
-  function setPattern(p) {
-    currentPattern = p;
-    document.querySelectorAll('.pattern-btn').forEach(b => b.classList.remove('active'));
-    const btn = document.getElementById('pat_' + p);
-    if (btn) btn.classList.add('active');
-  }
-
-  function setEnding(e) {
-    currentEnding = e;
-    document.querySelectorAll('.ending-btn').forEach(b => b.classList.remove('active'));
-    const btn = document.getElementById('end_' + e);
-    if (btn) btn.classList.add('active');
-  }
-
-  function setColor(c, elem) {
-    currentColor = c;
-    document.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('active'));
-    elem.classList.add('active');
-  }
-
-  function updateHistoryButtonsUI() {
-    const btnUndo = document.getElementById('btnUndo');
-    const btnRedo = document.getElementById('btnRedo');
-    if (btnUndo) btnUndo.disabled = (undoHistory.length <= 1);
-    if (btnRedo) btnRedo.disabled = (redoHistory.length === 0);
-  }
-
-  function saveState() {
-    if (isStateChanging) return;
-    const jsonState = JSON.stringify(canvas.toJSON(['name', 'customType', 'playerRole', 'playerNumber']));
-
-    if (undoHistory.length > 0 && undoHistory[undoHistory.length - 1] === jsonState) {
-      return;
-    }
-
-    undoHistory.push(jsonState);
-    if (undoHistory.length > 30) undoHistory.shift();
-
-    redoHistory = [];
-    updateHistoryButtonsUI();
-  }
-
-  function undo() {
-    if (undoHistory.length > 1) {
-      isStateChanging = true;
-      const currentState = undoHistory.pop();
-      redoHistory.push(currentState);
-
-      const prevState = undoHistory[undoHistory.length - 1];
-      canvas.loadFromJSON(prevState, () => {
-        lockBackgroundObjects();
-        resizeCanvasToFit();
-        canvas.renderAll();
-        isStateChanging = false;
-        updateHistoryButtonsUI();
-      });
-    }
-  }
-
-  function redo() {
-    if (redoHistory.length > 0) {
-      isStateChanging = true;
-      const nextState = redoHistory.pop();
-      undoHistory.push(nextState);
-
-      canvas.loadFromJSON(nextState, () => {
-        lockBackgroundObjects();
-        resizeCanvasToFit();
-        canvas.renderAll();
-        isStateChanging = false;
-        updateHistoryButtonsUI();
-      });
-    }
-  }
-
-  function clearCanvas() {
-    if (confirm('Очистить планшет? Все расставленные элементы пропадут.')) {
-      if (currentRinkType === 'half') drawHalfIce();
-      else drawFullIce();
-    }
-  }
-
-  function exportImage() {
-    canvas.discardActiveObject();
-    const tracingWasVisible = tracingObject && tracingObject.visible;
-    if (tracingObject) tracingObject.visible = false;
-
-    canvas.setZoom(1);
-    canvas.setWidth(currentVirtualWidth);
-    canvas.setHeight(VIRTUAL_HEIGHT);
-    canvas.renderAll();
-
-    const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
-
-    if (tracingObject && tracingWasVisible) {
-      tracingObject.visible = true;
-    }
-
-    resizeCanvasToFit();
-
-    const link = document.createElement('a');
-    link.download = `hockey_drill_${Date.now()}.png`;
-    link.href = dataURL;
-    link.click();
-  }
-
-  function saveToLibrary() {
-    const title = prompt('Введите название схемы:', 'Упражнение №' + (getDrills().length + 1));
-    if (!title) return;
-
-    const tracingWasVisible = tracingObject && tracingObject.visible;
-    if (tracingObject) tracingObject.visible = false;
-    canvas.discardActiveObject();
-
-    const canvasObjectsToSave = canvas.getObjects().filter(obj => obj !== tracingObject && obj.name !== 'rink_bg');
-    const canvasData = {
-      objects: canvasObjectsToSave.map(obj => obj.toObject(['name', 'customType', 'playerRole', 'playerNumber'])),
-      background: canvas.backgroundColor
-    };
-    const json = JSON.stringify(canvasData);
-
-    const thumb = canvas.toDataURL({ format: 'jpeg', quality: 0.6, multiplier: 0.3 });
-    const originalZoom = canvas.getZoom();
-    canvas.setZoom(1);
-    canvas.setWidth(currentVirtualWidth);
-    canvas.setHeight(VIRTUAL_HEIGHT);
-    canvas.renderAll();
-    const highResImage = canvas.toDataURL({ format: 'png', multiplier: 2 });
-
-    if (tracingObject && tracingWasVisible) {
-      tracingObject.visible = true;
-    }
-
-    resizeCanvasToFit();
-
-    const drills = getDrills();
-    let finalTitle = title;
-    let duplicateCount = 0;
-    drills.forEach(d => {
-      if (d.title === title || d.title.startsWith(title + " (вариант")) {
-        duplicateCount++;
-      }
-    });
-    if (duplicateCount > 0) {
-      finalTitle = `${title} (вариант ${duplicateCount + 1})`;
-    }
-
-    const now = Date.now();
-    drills.push({
-      id: now,
-      createdAt: now,
-      title: finalTitle,
-      thumb: thumb,
-      fullImage: highResImage,
-      data: json,
-      isHalfRink: (currentRinkType === 'half'),
-      aspectRatio: currentVirtualWidth / VIRTUAL_HEIGHT
-    });
-    localStorage.setItem('hockey_pro_drills', JSON.stringify(drills));
-    alert(`Схема сохранена как «${finalTitle}»!`);
-  }
-
-  async function exportDatabaseJSON() {
-    const drills = getDrills();
-    const hubEvents = getHubEvents();
-    if (drills.length === 0 && Object.keys(hubEvents).length === 0) {
-      alert('Нет сохраненных данных для экспорта.');
-      return;
-    }
-    
-    const fullBackup = { drills, hub: hubEvents };
-    const dataStr = JSON.stringify(fullBackup, null, 2);
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `hockey_full_backup_${dateStr}.json`;
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const file = new File([blob], fileName, { type: 'application/json' });
-
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: 'Резервная копия Хаба и Схем',
-          text: 'База тренировок и событий хоккейного хаба'
-        });
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-        console.warn('Share отменен/ошибка, качаем файлом:', err);
-      }
-    }
-
-    saveAs(blob, fileName);
-  }
-
-  function importDatabaseJSON(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      try {
-        const importedData = JSON.parse(event.target.result);
-        
-        let importedDrills = [];
-        if (Array.isArray(importedData)) {
-          importedDrills = importedData;
-        } else if (importedData.drills && Array.isArray(importedData.drills)) {
-          importedDrills = importedData.drills;
-          if (importedData.hub) {
-            localStorage.setItem('hockey_hub_events', JSON.stringify(importedData.hub));
-            renderCalendar();
-          }
-        } else {
-          alert('Ошибка: выбран неверный файл базы данных.');
-          return;
-        }
-
-        const currentDrills = getDrills();
-        const existingIds = new Set(currentDrills.map(d => d.id));
-        const existingTitles = new Set(currentDrills.map(d => d.title));
-        let addedCount = 0;
-
-        const finalDrills = [...currentDrills];
-        importedDrills.forEach(d => {
-          if (existingIds.has(d.id) || existingTitles.has(d.title)) {
-            let baseTitle = d.title.replace(/ \(вариант \d+\)$/, "");
-            let variantNum = 2;
-            let newTitle = `${baseTitle} (вариант ${variantNum})`;
-            
-            while (existingTitles.has(newTitle)) {
-              variantNum++;
-              newTitle = `${baseTitle} (вариант ${variantNum})`;
-            }
-
-            d.id = Date.now() + Math.floor(Math.random() * 10000);
-            d.title = newTitle;
-            existingTitles.add(newTitle);
-          }
-
-          if (!d.createdAt) d.createdAt = d.id || Date.now();
-
-          finalDrills.push(d);
-          existingIds.add(d.id);
-          existingTitles.add(d.title);
-          addedCount++;
-        });
-
-        localStorage.setItem('hockey_pro_drills', JSON.stringify(finalDrills));
-        alert(`Импорт завершен! Добавлено схем: ${addedCount}`);
-        e.target.value = '';
-      } catch (err) {
-        alert('Ошибка при чтении базы: ' + err.message);
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  async function handleMultipleDrillsUpload(e) {
-    const files = Array.from(e.target.files);
-    if (!files || files.length === 0) return;
-
-    let addedCount = 0;
-    const drills = getDrills();
-    const existingTitles = new Set(drills.map(d => d.title));
-
-    for (const file of files) {
-      let title = file.name.replace(/\.[^/.]+$/, "");
-
-      if (existingTitles.has(title)) {
-        let variantNum = 2;
-        let newTitle = `${title} (вариант ${variantNum})`;
-        while (existingTitles.has(newTitle)) {
-          variantNum++;
-          newTitle = `${title} (вариант ${variantNum})`;
-        }
-        title = newTitle;
-      }
-      existingTitles.add(title);
-
-      try {
-        const fullImgData = await readFileAsDataURLAsync(file);
-        const { thumbData, isHalf, aspectRatio } = await processImageMetricsAsync(fullImgData);
-
-        const now = Date.now() + Math.floor(Math.random() * 10000);
-        drills.push({
-          id: now,
-          createdAt: now,
-          title: title,
-          thumb: thumbData,
-          fullImage: fullImgData,
-          data: null,
-          isUploadedImage: true,
-          isHalfRink: isHalf,
-          aspectRatio: aspectRatio
-        });
-
-        addedCount++;
-      } catch (err) {
-        console.error("Ошибка загрузки файла:", file.name, err);
-      }
-    }
-
-    localStorage.setItem('hockey_pro_drills', JSON.stringify(drills));
-    alert(`Успешно загружено схем с ПК: ${addedCount}`);
-    e.target.value = '';
-  }
-
-  function readFileAsDataURLAsync(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => resolve(ev.target.result);
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function processImageMetricsAsync(dataUrl) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const aspect = img.width / img.height;
-        const isHalf = (aspect < 1.45);
-
-        const thumbCanvas = document.createElement('canvas');
-        const tw = 240;
-        const th = tw / aspect || 130;
-        thumbCanvas.width = tw;
-        thumbCanvas.height = th;
-        const ctx = thumbCanvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, tw, th);
-        const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.7);
-
-        resolve({ thumbData, isHalf, aspectRatio: aspect });
-      };
-      img.src = dataUrl;
-    });
-  }
-
-  function getDrills() {
-    const raw = JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]');
-    raw.forEach(d => {
-      if (!d.createdAt) d.createdAt = d.id || 0;
-    });
-    return raw;
-  }
-
-  function sortDrillsArray(arr, sortType) {
-    if (sortType === 'newest') {
-      return arr.sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
-    } else if (sortType === 'oldest') {
-      return arr.sort((a, b) => (a.createdAt || a.id) - (b.createdAt || b.id));
-    } else if (sortType === 'title') {
-      return arr.sort((a, b) => a.title.localeCompare(b.title));
-    }
-    return arr;
-  }
-
-  function openHistoryModal() {
-    const modal = document.getElementById('historyModal');
-    const searchInput = document.getElementById('librarySearchInput');
-    if (searchInput) searchInput.value = '';
-    renderLibraryModalGrid();
-    if (modal) modal.style.display = 'flex';
-  }
-
-  function closeHistoryModal() {
-    const modal = document.getElementById('historyModal');
-    if (modal) modal.style.display = 'none';
-  }
-
-  function renderLibraryModalGrid() {
-    const list = document.getElementById('savedDrillsList');
-    const searchInput = document.getElementById('librarySearchInput');
-    const sortSelect = document.getElementById('librarySortSelect');
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-    const sortType = sortSelect ? sortSelect.value : 'newest';
-
-    list.innerHTML = '';
-    let drills = getDrills();
-
-    if (query) {
-      drills = drills.filter(d => d.title.toLowerCase().includes(query));
-    }
-
-    drills = sortDrillsArray(drills, sortType);
-
-    if (drills.length === 0) {
-      list.innerHTML = '<div style="color:var(--text-muted); padding:10px; grid-column:1/-1;">Нет схем в библиотеке.</div>';
-      return;
-    }
-
-    drills.forEach(d => {
-      const card = document.createElement('div');
-      card.className = 'drill-item';
-      card.innerHTML = `
-        <img src="${d.thumb}" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="Нажмите для просмотра на весь экран">
-        <span class="btn-preview-zoom" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="На весь экран"><i class="ph ph-magnifying-glass-plus"></i></span>
-        ${d.isHalfRink ? '<span class="badge-half">1/2 поля</span>' : ''}
-        <div class="drill-item-info">
-          <span style="font-size:11px; font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:80px;" title="${d.title}">${d.title}</span>
-          <div style="display:flex; gap:3px;">
-            <button onclick="loadDrill(${d.id}); event.stopPropagation();" title="Открыть для редактирования"><i class="ph ph-pencil-simple"></i></button>
-            <button onclick="renameDrill(${d.id}); event.stopPropagation();" title="Переименовать"><i class="ph ph-textbox"></i></button>
-            <button class="btn-danger" onclick="deleteDrillFromLibrary(${d.id}); event.stopPropagation();" title="Удалить"><i class="ph ph-trash"></i></button>
-          </div>
-        </div>
-      `;
-      list.appendChild(card);
-    });
-  }
-
-  function openImagePreview(imgSrc, title) {
-    document.getElementById('previewModalImg').src = imgSrc;
-    document.getElementById('previewModalTitle').textContent = title;
-    document.getElementById('imagePreviewModal').style.display = 'flex';
-  }
-
-  function closeImagePreview() {
-    document.getElementById('imagePreviewModal').style.display = 'none';
-  }
-
-  function renameDrill(id) {
-    let drills = getDrills();
-    const drill = drills.find(item => item.id === id);
-    if (!drill) return;
-
-    const newTitle = prompt('Введите новое название схемы:', drill.title);
-    if (!newTitle || !newTitle.trim()) return;
-
-    drill.title = newTitle.trim();
-    localStorage.setItem('hockey_pro_drills', JSON.stringify(drills));
-    renderLibraryModalGrid();
-  }
-
-  function deleteDrillFromLibrary(id) {
-    if (!confirm('Удалить эту схему из библиотеки?')) return;
-    let drills = getDrills();
-    drills = drills.filter(d => d.id !== id);
-    localStorage.setItem('hockey_pro_drills', JSON.stringify(drills));
-    renderLibraryModalGrid();
-  }
-
-  function loadDrill(id) {
-    const d = getDrills().find(item => item.id === id);
-    if (!d) return;
-
-    const loadAndRender = (canvasData) => {
-      canvas.clear();
-      currentRinkType = d.isHalfRink ? 'half' : 'full';
-      currentVirtualWidth = d.isHalfRink ? VIRTUAL_WIDTH_HALF : VIRTUAL_WIDTH_FULL;
-      document.getElementById('btnFullRink').classList.toggle('active', !d.isHalfRink);
-      document.getElementById('btnHalfRink').classList.toggle('active', !!d.isHalfRink);
-
-      if (currentRinkType === 'half') {
-        drawHalfIceWithoutReset();
-      } else {
-        drawFullIceWithoutReset();
-      }
-
-      if (canvasData && canvasData.objects) {
-        fabric.util.enlivenObjects(canvasData.objects, (enlivenedObjects) => {
-          enlivenedObjects.forEach(obj => {
-            canvas.add(obj);
-          });
-          lockBackgroundObjects();
-          resizeCanvasToFit();
-          canvas.renderAll();
-          saveState();
-        });
-      } else {
-        fabric.Image.fromURL(d.fullImage, (img) => {
-          img.scaleToWidth(currentVirtualWidth);
-          img.scaleToHeight(VIRTUAL_HEIGHT);
-          img.set({ selectable: false, evented: false, name: 'rink_bg' });
-          canvas.add(img);
-          lockBackgroundObjects();
-          resizeCanvasToFit();
-          canvas.renderAll();
-          saveState();
-        });
-      }
-    };
-
-    if (d.data) {
-      try {
-        const parsed = JSON.parse(d.data);
-        loadAndRender(parsed);
-      } catch (err) {
-        loadAndRender(null);
-      }
-    } else {
-      loadAndRender(null);
-    }
-
-    closeHistoryModal();
-  }
-
-  function drawFullIceWithoutReset() {
-    const w = VIRTUAL_WIDTH_FULL;
-    const h = VIRTUAL_HEIGHT;
-    const red = '#dc2626';
-    const blue = '#2563eb';
+    const w = VIRTUAL_WIDTH_FULL, h = VIRTUAL_HEIGHT;
+    const red = '#dc2626', blue = '#2563eb';
 
     const base = new fabric.Rect({ left: 0, top: 0, width: w, height: h, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
     const boards = new fabric.Rect({ left: 15, top: 15, width: w - 30, height: h - 30, fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, rx: 55, ry: 55, selectable: false, evented: false, name: 'rink_bg' });
@@ -3272,485 +1866,147 @@
     const blueR = new fabric.Line([w * 0.65, 15, w * 0.65, h - 15], { stroke: blue, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
     const centerCircle = new fabric.Circle({ left: w / 2, top: h / 2, originX: 'center', originY: 'center', radius: 78, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
     const centerDot = new fabric.Circle({ left: w / 2, top: h / 2, originX: 'center', originY: 'center', radius: 5, fill: blue, selectable: false, evented: false, name: 'rink_bg' });
+
     const goalLineL = new fabric.Line([w * 0.10, 35, w * 0.10, h - 35], { stroke: red, strokeWidth: 3, selectable: false, evented: false, name: 'rink_bg' });
     const goalLineR = new fabric.Line([w * 0.92, 35, w * 0.92, h - 35], { stroke: red, strokeWidth: 3, selectable: false, evented: false, name: 'rink_bg' });
     const creaseL = new fabric.Circle({ left: w * 0.10, top: h / 2, originX: 'center', originY: 'center', radius: 22, startAngle: -Math.PI / 2, endAngle: Math.PI / 2, stroke: red, strokeWidth: 2, fill: 'rgba(56, 189, 248, 0.25)', selectable: false, evented: false, name: 'rink_bg' });
     const creaseR = new fabric.Circle({ left: w * 0.92, top: h / 2, originX: 'center', originY: 'center', radius: 22, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2, stroke: red, strokeWidth: 2, fill: 'rgba(56, 189, 248, 0.25)', selectable: false, evented: false, name: 'rink_bg' });
 
-    const trapLineL1 = new fabric.Line([w * 0.10, h * 0.40, 18, h * 0.34], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLineL2 = new fabric.Line([w * 0.10, h * 0.60, 18, h * 0.66], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLineR1 = new fabric.Line([w * 0.92, h * 0.40, w - 18, h * 0.34], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLineR2 = new fabric.Line([w * 0.92, h * 0.60, w - 18, h * 0.66], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-
     const fixedGoalL = createRealisticGoalObject(w * 0.10, h / 2, true, false);
     const fixedGoalR = createRealisticGoalObject(w * 0.92, h / 2, false, false);
 
-    canvas.add(base, boards, centerRed, blueL, blueR, centerCircle, centerDot, goalLineL, goalLineR, creaseL, creaseR, trapLineL1, trapLineL2, trapLineR1, trapLineR2, fixedGoalL, fixedGoalR);
-
-    const faceoffX1 = w * 0.22, faceoffX2 = w * 0.78, faceoffY1 = h * 0.28, faceoffY2 = h * 0.72;
-    [{ x: faceoffX1, y: faceoffY1 }, { x: faceoffX1, y: faceoffY2 }, { x: faceoffX2, y: faceoffY1 }, { x: faceoffX2, y: faceoffY2 }].forEach(pt => drawFaceoffCircle(pt.x, pt.y, red));
-
-    const neutralX1 = w * 0.38, neutralX2 = w * 0.62;
-    [{ x: neutralX1, y: h * 0.32 }, { x: neutralX1, y: h * 0.68 }, { x: neutralX2, y: h * 0.32 }, { x: neutralX2, y: h * 0.68 }].forEach(pt => {
-      canvas.add(new fabric.Circle({ left: pt.x, top: pt.y, originX: 'center', originY: 'center', radius: 4.5, fill: red, selectable: false, evented: false, name: 'rink_bg' }));
-    });
-
-    drawBenchesAndPenaltyBoxes(w, h);
+    canvas.add(base, boards, centerRed, blueL, blueR, centerCircle, centerDot, goalLineL, goalLineR, creaseL, creaseR, fixedGoalL, fixedGoalR);
     lockBackgroundObjects();
+    resizeCanvasToFit();
+    saveState();
   }
 
-  function drawHalfIceWithoutReset() {
-    const wHalf = VIRTUAL_WIDTH_HALF;
-    const h = VIRTUAL_HEIGHT;
-    const red = '#dc2626';
-    const blue = '#2563eb';
-
-    const base = new fabric.Rect({ left: 0, top: 0, width: wHalf, height: h, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
-    const boardsHalfPath = `M ${wHalf} 15 L 65 15 A 50 50 0 0 0 15 65 L 15 ${h - 65} A 50 50 0 0 0 65 ${h - 15} L ${wHalf} ${h - 15} Z`;
-    const boards = new fabric.Path(boardsHalfPath, { fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, selectable: false, evented: false, name: 'rink_bg' });
-    const centerRed = new fabric.Line([wHalf, 15, wHalf, h - 15], { stroke: red, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
-    const centerCircleHalf = new fabric.Circle({ left: wHalf, top: h / 2, originX: 'center', originY: 'center', radius: 78, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const centerDotHalf = new fabric.Circle({ left: wHalf, top: h / 2, originX: 'center', originY: 'center', radius: 5, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2, fill: blue, selectable: false, evented: false, name: 'rink_bg' });
-    const blueX = VIRTUAL_WIDTH_FULL * 0.35;
-    const blueLine = new fabric.Line([blueX, 15, blueX, h - 15], { stroke: blue, strokeWidth: 5, selectable: false, evented: false, name: 'rink_bg' });
-    const neutralX = VIRTUAL_WIDTH_FULL * 0.38;
-    const neutralDot1 = new fabric.Circle({ left: neutralX, top: h * 0.32, originX: 'center', originY: 'center', radius: 4.5, fill: red, selectable: false, evented: false, name: 'rink_bg' });
-    const neutralDot2 = new fabric.Circle({ left: neutralX, top: h * 0.68, originX: 'center', originY: 'center', radius: 4.5, fill: red, selectable: false, evented: false, name: 'rink_bg' });
-    const goalLineX = VIRTUAL_WIDTH_FULL * 0.10;
-    const goalLine = new fabric.Line([goalLineX, 35, goalLineX, h - 35], { stroke: red, strokeWidth: 3, selectable: false, evented: false, name: 'rink_bg' });
-    const crease = new fabric.Circle({ left: goalLineX, top: h / 2, originX: 'center', originY: 'center', radius: 22, startAngle: -Math.PI / 2, endAngle: Math.PI / 2, stroke: red, strokeWidth: 2, fill: 'rgba(56, 189, 248, 0.25)', selectable: false, evented: false, name: 'rink_bg' });
-
-    const trapLine1 = new fabric.Line([goalLineX, h * 0.40, 18, h * 0.34], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const trapLine2 = new fabric.Line([goalLineX, h * 0.60, 18, h * 0.66], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const fixedGoal = createRealisticGoalObject(goalLineX, h / 2, true, false);
-
-    canvas.add(base, boards, centerRed, centerCircleHalf, centerDotHalf, blueLine, neutralDot1, neutralDot2, goalLine, crease, trapLine1, trapLine2, fixedGoal);
-
-    const faceoffX = VIRTUAL_WIDTH_FULL * 0.22;
-    drawFaceoffCircle(faceoffX, h * 0.28, red);
-    drawFaceoffCircle(faceoffX, h * 0.72, red);
-
-    lockBackgroundObjects();
+  function setRinkPreset(t) {
+    currentRinkType = t;
+    currentVirtualWidth = (t === 'half') ? VIRTUAL_WIDTH_HALF : VIRTUAL_WIDTH_FULL;
+    drawFullIce();
   }
 
-  function openWorkoutBuilderModal() {
-    const modal = document.getElementById('workoutBuilderModal');
-    document.getElementById('drillSearchInput').value = '';
-    selectedWorkoutDrills = [];
-    updateSelectedCount();
-    renderWorkoutSelectableGrid();
-    renderSelectedQueue();
-    if (modal) modal.style.display = 'flex';
+  function setTool(t) {
+    currentTool = t;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(t === 'select' ? 'toolSelect' : (t === 'brush' ? 'toolBrush' : (t === 'straightArrow' ? 'toolStraightArrow' : 'toolEraser')))?.classList.add('active');
+    canvas.selection = (t === 'select');
   }
 
-  function closeWorkoutBuilderModal() {
-    const modal = document.getElementById('workoutBuilderModal');
-    if (modal) modal.style.display = 'none';
-  }
+  function setPattern(p) { currentPattern = p; }
+  function setColor(c, el) { currentColor = c; document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active')); el.classList.add('active'); }
+  function preparePlacement(type, options) { placementItem = { type, options }; setTool('placement'); }
 
-  function filterDrillsGrid() {
-    renderWorkoutSelectableGrid();
-  }
-
-  function renderWorkoutSelectableGrid() {
-    const grid = document.getElementById('workoutSelectableGrid');
-    const searchInput = document.getElementById('drillSearchInput');
-    const sortSelect = document.getElementById('workoutSortSelect');
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-    const sortType = sortSelect ? sortSelect.value : 'newest';
-
-    grid.innerHTML = '';
-    let drills = getDrills();
-
-    if (query) {
-      drills = drills.filter(d => d.title.toLowerCase().includes(query));
-    }
-
-    drills = sortDrillsArray(drills, sortType);
-
-    if (drills.length === 0) {
-      grid.innerHTML = '<div style="color:var(--text-muted); padding:10px; grid-column:1/-1;">Ничего не найдено.</div>';
-      return;
-    }
-
-    drills.forEach(d => {
-      const card = document.createElement('div');
-      card.className = 'drill-item';
-      card.id = `selectable_drill_${d.id}`;
-      card.innerHTML = `
-        <div class="badge-order" id="badge_order_${d.id}" style="display:none;"></div>
-        <img src="${d.thumb}" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="Нажмите для просмотра на весь экран">
-        <span class="btn-preview-zoom" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="На весь экран"><i class="ph ph-magnifying-glass-plus"></i></span>
-        ${d.isHalfRink ? '<span class="badge-half">1/2 поля</span>' : ''}
-        <button class="btn-select-plus" id="btn_plus_${d.id}" onclick="toggleDrillSelection(${d.id}, event)">
-          <i class="ph-bold ph-plus"></i>
-        </button>
-        <div class="drill-item-info">
-          <span style="font-size:11px; font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:110px;" title="${d.title}">${d.title}</span>
-        </div>
-      `;
-      grid.appendChild(card);
-    });
-
-    refreshSelectionBadges();
-  }
-
-  function renderSelectedQueue() {
-    const container = document.getElementById('workoutQueueContainer');
-    const track = document.getElementById('selectedQueueTrack');
-    const countLabel = document.getElementById('queueCountLabel');
-    if (!container || !track) return;
-
-    if (selectedWorkoutDrills.length === 0) {
-      container.style.display = 'none';
-      track.innerHTML = '';
-      return;
-    }
-
-    container.style.display = 'flex';
-    countLabel.textContent = `${selectedWorkoutDrills.length} шт.`;
-    track.innerHTML = '';
-
-    selectedWorkoutDrills.forEach((drill, index) => {
-      const card = document.createElement('div');
-      card.className = 'queue-card';
-      card.innerHTML = `
-        <span class="queue-order-badge">№${index + 1}</span>
-        <img src="${drill.thumb}" onclick="openImagePreview('${drill.fullImage || drill.thumb}', '${drill.title}');" style="cursor:pointer;" title="Нажмите для увеличения">
-        <div class="queue-card-body">
-          <span style="font-size:10px; font-weight:700; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="${drill.title}">${drill.title}</span>
-          <div class="queue-controls">
-            <button ${index === 0 ? 'disabled' : ''} onclick="moveQueueItem(${index}, -1)" title="Сдвинуть влево">◀</button>
-            <button class="btn-danger" onclick="removeFromQueue(${index})" title="Убрать из очереди">✕</button>
-            <button ${index === selectedWorkoutDrills.length - 1 ? 'disabled' : ''} onclick="moveQueueItem(${index}, 1)" title="Сдвинуть вправо">▶</button>
-          </div>
-        </div>
-      `;
-      track.appendChild(card);
-    });
-  }
-
-  function moveQueueItem(index, direction) {
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= selectedWorkoutDrills.length) return;
-
-    const item = selectedWorkoutDrills.splice(index, 1)[0];
-    selectedWorkoutDrills.splice(newIndex, 0, item);
-
-    renderSelectedQueue();
-    refreshSelectionBadges();
-  }
-
-  function removeFromQueue(index) {
-    selectedWorkoutDrills.splice(index, 1);
-    renderSelectedQueue();
-    refreshSelectionBadges();
-    updateSelectedCount();
-  }
-
-  function toggleDrillSelection(id, e) {
-    e.stopPropagation();
-    const drills = getDrills();
-    const target = drills.find(d => d.id === id);
-    if (!target) return;
-
-    const existingIndex = selectedWorkoutDrills.findIndex(d => d.id === id);
-    if (existingIndex > -1) {
-      selectedWorkoutDrills.splice(existingIndex, 1);
-    } else {
-      selectedWorkoutDrills.push(target);
-    }
-
-    renderSelectedQueue();
-    refreshSelectionBadges();
-    updateSelectedCount();
-  }
-
-  function refreshSelectionBadges() {
-    const drills = getDrills();
-    drills.forEach(d => {
-      const badge = document.getElementById(`badge_order_${d.id}`);
-      const btnPlus = document.getElementById(`btn_plus_${d.id}`);
-      if (!badge || !btnPlus) return;
-
-      const index = selectedWorkoutDrills.findIndex(item => item.id === d.id);
-      if (index > -1) {
-        badge.style.display = 'block';
-        badge.textContent = `№${index + 1}`;
-        btnPlus.classList.add('selected');
-        btnPlus.innerHTML = '<i class="ph-bold ph-check"></i>';
-      } else {
-        badge.style.display = 'none';
-        btnPlus.classList.remove('selected');
-        btnPlus.innerHTML = '<i class="ph-bold ph-plus"></i>';
-      }
-    });
-  }
-
-  function updateSelectedCount() {
-    document.getElementById('selectedCountLabel').textContent = `Выбрано упражнений: ${selectedWorkoutDrills.length}`;
-  }
-
-  function base64ToUint8Array(base64Str) {
-    if (!base64Str) return new Uint8Array();
-    const cleanStr = base64Str.includes(',') ? base64Str.split(',')[1] : base64Str;
-    const binary = atob(cleanStr);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  }
-
-  async function generateWordDocument() {
-    if (selectedWorkoutDrills.length === 0) {
-      alert('Пожалуйста, выберите хотя бы одно упражнение!');
-      return;
-    }
-
-    const btn = document.getElementById('btnGenerateDocx');
-    const originalBtnHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ph-bold ph-spinner"></i> Сборка...';
-
-    try {
-      const docxLib = window.docx;
-      if (!docxLib) {
-        throw new Error('Библиотека docx не загружена.');
-      }
-
-      const { Document, Paragraph, TextRun, ImageRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, Packer } = docxLib;
-
-      const title = document.getElementById('workoutTitleInput').value.trim() || 'Лед утро 27.07.26';
-      const time = document.getElementById('workoutTimeInput').value.trim() || '';
-      const duration = document.getElementById('workoutDurationInput').value.trim() || '';
-
-      const gridBorder = { style: BorderStyle.SINGLE, size: 8, color: "334155" };
-      const children = [];
-
-      const headerTable = new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder, insideHorizontal: gridBorder, insideVertical: gridBorder },
-        rows: [
-          new TableRow({
-            cantSplit: true,
-            children: [
-              new TableCell({
-                width: { size: 45, type: WidthType.PERCENTAGE },
-                borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
-                children: [
-                  new Paragraph({
-                    alignment: AlignmentType.START,
-                    spacing: { before: 40, after: 40 },
-                    children: [new TextRun({ text: title, bold: true, size: 24, font: "Arial" })]
-                  })
-                ]
-              }),
-              new TableCell({
-                width: { size: 30, type: WidthType.PERCENTAGE },
-                borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
-                children: [
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    spacing: { before: 40, after: 40 },
-                    children: [new TextRun({ text: time, bold: true, size: 24, font: "Arial" })]
-                  })
-                ]
-              }),
-              new TableCell({
-                width: { size: 25, type: WidthType.PERCENTAGE },
-                borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
-                children: [
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    spacing: { before: 40, after: 40 },
-                    children: [new TextRun({ text: duration, bold: true, size: 24, font: "Arial" })]
-                  })
-                ]
-              })
-            ]
-          })
-        ]
-      });
-
-      children.push(headerTable);
-      children.push(new Paragraph({ spacing: { after: 120 } }));
-
-      const slots = [];
-      let idx = 0;
-
-      while (idx < selectedWorkoutDrills.length) {
-        const current = selectedWorkoutDrills[idx];
-        const next = selectedWorkoutDrills[idx + 1];
-
-        if (current.isHalfRink && next && next.isHalfRink) {
-          slots.push({ type: 'pair_half', items: [current, next] });
-          idx += 2;
-        } else {
-          slots.push({ type: 'single', item: current });
-          idx += 1;
+  function setupCanvasEvents() {
+    canvas.on('mouse:down', opt => {
+      const p = canvas.getPointer(opt.e);
+      if (currentTool === 'placement' && placementItem) {
+        if (placementItem.type === 'player') {
+          const g = new fabric.Group([
+            new fabric.Circle({ radius: 14, fill: placementItem.options.color, stroke: '#fff', strokeWidth: 2, originX:'center', originY:'center' }),
+            new fabric.Text(placementItem.options.role, { fontSize: 12, fill: '#fff', fontWeight: 'bold', originX:'center', originY:'center' })
+          ], { left: p.x, top: p.y, originX: 'center', originY: 'center' });
+          canvas.add(g);
+        } else if (placementItem.type === 'puck') {
+          canvas.add(new fabric.Circle({ left: p.x, top: p.y, radius: 7, fill: '#000', stroke: '#fff', strokeWidth: 1.5, originX:'center', originY:'center' }));
         }
+        saveState();
+        return;
       }
-
-      for (let s = 0; s < slots.length; s++) {
-        const slot = slots[s];
-
-        if (slot.type === 'single') {
-          const drill = slot.item;
-          const imgBytes = base64ToUint8Array(drill.fullImage || drill.thumb);
-
-          const targetWidth = drill.isHalfRink ? 380 : 570;
-          const targetHeight = drill.isHalfRink ? 280 : 270;
-
-          const cardTable = new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder, insideHorizontal: gridBorder, insideVertical: gridBorder },
-            rows: [
-              new TableRow({
-                cantSplit: true,
-                children: [
-                  new TableCell({
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
-                    children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        keepWithNext: true,
-                        spacing: { before: 60, after: 60 },
-                        children: [
-                          new TextRun({
-                            text: drill.title,
-                            bold: true,
-                            size: 24,
-                            font: "Arial"
-                          })
-                        ]
-                      }),
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 80 },
-                        children: [
-                          new ImageRun({
-                            data: imgBytes,
-                            transformation: {
-                              width: targetWidth,
-                              height: targetHeight
-                            }
-                          })
-                        ]
-                      })
-                    ]
-                  })
-                ]
-              })
-            ]
-          });
-
-          children.push(cardTable);
-          children.push(new Paragraph({ spacing: { after: 120 } }));
-
-        } else if (slot.type === 'pair_half') {
-          const d1 = slot.items[0];
-          const d2 = slot.items[1];
-          const bytes1 = base64ToUint8Array(d1.fullImage || d1.thumb);
-          const bytes2 = base64ToUint8Array(d2.fullImage || d2.thumb);
-
-          const pairTable = new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
-            rows: [
-              new TableRow({
-                cantSplit: true,
-                children: [
-                  new TableCell({
-                    width: { size: 50, type: WidthType.PERCENTAGE },
-                    borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
-                    children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        keepWithNext: true,
-                        spacing: { before: 60, after: 60 },
-                        children: [new TextRun({ text: d1.title, bold: true, size: 22, font: "Arial" })]
-                      }),
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 80 },
-                        children: [
-                          new ImageRun({
-                            data: bytes1,
-                            transformation: { width: 275, height: 250 }
-                          })
-                        ]
-                      })
-                    ]
-                  }),
-                  new TableCell({
-                    width: { size: 50, type: WidthType.PERCENTAGE },
-                    borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
-                    children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        keepWithNext: true,
-                        spacing: { before: 60, after: 60 },
-                        children: [new TextRun({ text: d2.title, bold: true, size: 22, font: "Arial" })]
-                      }),
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 80 },
-                        children: [
-                          new ImageRun({
-                            data: bytes2,
-                            transformation: { width: 275, height: 250 }
-                          })
-                        ]
-                      })
-                    ]
-                  })
-                ]
-              })
-            ]
-          });
-
-          children.push(pairTable);
-          children.push(new Paragraph({ spacing: { after: 120 } }));
-        }
+      if (currentTool === 'eraser' && opt.target) { canvas.remove(opt.target); saveState(); return; }
+      if (currentTool === 'brush') {
+        isMouseDown = true;
+        rawPoints = [p];
+        livePreviewLine = new fabric.Polyline([p], { stroke: currentColor, strokeWidth, fill: 'transparent' });
+        canvas.add(livePreviewLine);
       }
+    });
 
-      const doc = new Document({
-        sections: [{
-          properties: {
-            page: {
-              margin: {
-                top: 720,
-                right: 720,
-                bottom: 720,
-                left: 720
-              }
-            }
-          },
-          children: children
-        }]
+    canvas.on('mouse:move', opt => {
+      if (!isMouseDown || currentTool !== 'brush') return;
+      const p = canvas.getPointer(opt.e);
+      rawPoints.push(p);
+      livePreviewLine.points = [...rawPoints];
+      canvas.requestRenderAll();
+    });
+
+    canvas.on('mouse:up', () => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+      if (currentTool === 'brush' && livePreviewLine) {
+        canvas.remove(livePreviewLine);
+        canvas.add(new fabric.Polyline(rawPoints, { stroke: currentColor, strokeWidth, fill: 'transparent' }));
+        saveState();
+      }
+    });
+  }
+
+  function saveState() {
+    if (isStateChanging) return;
+    const json = JSON.stringify(canvas.toJSON(['name', 'customType']));
+    undoHistory.push(json);
+    if (undoHistory.length > 25) undoHistory.shift();
+  }
+  function undo() {
+    if (undoHistory.length > 1) {
+      isStateChanging = true;
+      redoHistory.push(undoHistory.pop());
+      canvas.loadFromJSON(undoHistory[undoHistory.length - 1], () => {
+        lockBackgroundObjects();
+        canvas.renderAll();
+        isStateChanging = false;
       });
-
-      const blob = await Packer.toBlob(doc);
-      saveAs(blob, `${title}.docx`);
-      closeWorkoutBuilderModal();
-
-    } catch (err) {
-      console.error("Ошибка DOCX:", err);
-      alert('Ошибка при формировании Word документа: ' + err.message);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = originalBtnHtml;
     }
   }
+  function redo() {
+    if (redoHistory.length > 0) {
+      isStateChanging = true;
+      const s = redoHistory.pop();
+      undoHistory.push(s);
+      canvas.loadFromJSON(s, () => {
+        lockBackgroundObjects();
+        canvas.renderAll();
+        isStateChanging = false;
+      });
+    }
+  }
+
+  function clearCanvas() { if (confirm('Очистить планшет?')) drawFullIce(); }
+  function exportImage() {
+    const a = document.createElement('a');
+    a.download = `drill_${Date.now()}.png`;
+    a.href = canvas.toDataURL({ format: 'png' });
+    a.click();
+  }
+
+  function saveToLibrary() {
+    const t = prompt('Название схемы:', 'Упражнение');
+    if (!t) return;
+    const drills = JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]');
+    drills.push({ id: Date.now(), title: t, thumb: canvas.toDataURL({ format: 'jpeg', quality: 0.5 }) });
+    localStorage.setItem('hockey_pro_drills', JSON.stringify(drills));
+    alert('Схема сохранена!');
+  }
+
+  function openHistoryModal() {
+    const list = document.getElementById('savedDrillsList');
+    list.innerHTML = '';
+    const drills = JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]');
+    drills.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'drill-item';
+      div.innerHTML = `<img src="${d.thumb}"><div class="drill-item-info"><span>${d.title}</span></div>`;
+      list.appendChild(div);
+    });
+    document.getElementById('historyModal').style.display = 'flex';
+  }
+  function closeHistoryModal() { document.getElementById('historyModal').style.display = 'none'; }
 
   // ЗАПУСК
   window.addEventListener('DOMContentLoaded', () => {
     drawFullIce();
     setupCanvasEvents();
-    setupKeyEvents();
-    setupModalOverlayCloseEvents();
     renderCalendar();
   });
 </script>
