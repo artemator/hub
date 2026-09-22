@@ -939,7 +939,7 @@
     openSelectWorkoutModal();
   }
 
-  /* ВСТАВКА И РАСПОЗНАВАНИЕ МХЛ / КХЛ */
+  /* ВСТАВКА И РАСПОЗНАВАНИЕ МХЛ / КХЛ (РАЗДЕЛЬНЫЕ ШАПКИ ДЛЯ ВРАТАРЕЙ И ИГРОКОВ) */
   function openMhlPasteModal() {
     document.getElementById('mhlRawInput').value = '';
     document.getElementById('mhlPasteModal').style.display = 'flex';
@@ -949,7 +949,7 @@
     document.getElementById('mhlPasteModal').style.display = 'none';
   }
 
-function processMhlPastedText() {
+  function processMhlPastedText() {
     const rawText = document.getElementById('mhlRawInput').value;
     if (!rawText.trim()) {
       alert('Поле пустое. Вставьте скопированный текст.');
@@ -965,7 +965,7 @@ function processMhlPastedText() {
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
 
-      // 1. Определение текущего блока по заголовкам
+      // Определение текущего блока по заголовкам
       if (/^вратари/i.test(line)) {
         currentRole = 'goalie';
         continue;
@@ -975,17 +975,17 @@ function processMhlPastedText() {
         continue;
       }
 
-      // Пропускаем служебные заголовки колонок сайта
+      // Пропускаем служебные заголовки таблицы сайта
       if (/^(игрок|глоссарий|%\s*об|%\s*вбр)/i.test(line)) continue;
       if (/^[ишпво\+\/\-\s%]+$/i.test(line)) continue;
 
-      // 2. Если строка состоит только из номера игрока
+      // Если в строке только номер
       if (/^\d{1,2}$/.test(line)) {
         pendingNum = line;
         continue;
       }
 
-      // 3. Поиск ФИО игрока в начале строки
+      // Поиск имени хоккеиста
       const nameMatch = line.match(/^([А-ЯЁ][а-яё\-]+(?:\s+[А-ЯЁ][а-яё\-]+|\s+[А-ЯЁ]\.|\s+М\.)*(?:\s*\([КАA-ZА-Я]\))*)/);
       if (nameMatch) {
         const playerName = nameMatch[1].trim();
@@ -995,16 +995,15 @@ function processMhlPastedText() {
         const rest = line.substring(nameMatch[0].length).trim();
 
         if (currentRole === 'goalie') {
-          // --- ШАПКА ВРАТАРЕЙ ---
-          // И, В, П, ИБ, БВ, ПШ, ОБ, %ОБ, КН, А, И"0", Штр, ВП
+          // ШАПКА ВРАТАРЕЙ: И, В, П, ИБ, БВ, ПШ, ОБ, %ОБ, КН, А, И"0", Штр, ВП
           let a = '0', pim = '0';
-
           const tokens = rest.split(/[\t\s]+/).filter(Boolean);
+
           if (tokens.length >= 8) {
             a = tokens[9] || '0';
             pim = tokens[11] || '0';
           } else {
-            // Если цифры склеились (например: "10102011995.01.0000059:49")
+            // Если показатели склеились
             const timeMatch = rest.match(/(\d+):(\d+)/);
             if (timeMatch) {
               const beforeTime = rest.substring(0, timeMatch.index);
@@ -1021,10 +1020,8 @@ function processMhlPastedText() {
             plusMinus: '0',
             pim: isNaN(parseInt(pim)) ? '0' : pim
           });
-
         } else {
-          // --- ШАПКА ПОЛЕВЫХ ИГРОКОВ ---
-          // И, Ш, А, О, +/-, +, -, Штр, ШР, ШБ, ШМ, ШО, ШП, РБ, БВ, %БВ...
+          // ШАПКА ПОЛЕВЫХ ИГРОКОВ: И, Ш, А, О, +/-, +, -, Штр, ШР...
           let g = '0', a = '0', plusMinus = '0', pim = '0';
 
           const pmMatch = rest.match(/([+-]\d+)/);
@@ -1036,13 +1033,12 @@ function processMhlPastedText() {
             a = tokens[2] || '0';
             pim = tokens[7] || '0';
           } else {
-            // Если цифры склеились (например: "1000-101000000010.0...")
+            // Если показатели склеились
             const digits = rest.match(/^(\d)(\d)(\d)(\d)/);
             if (digits) {
-              g = digits[2]; // Шайбы
-              a = digits[3]; // Передачи
+              g = digits[2]; // Голы (Ш)
+              a = digits[3]; // Передачи (А)
             }
-            // Штраф после полезности
             if (pmMatch) {
               const afterPm = rest.substring(pmMatch.index + pmMatch[0].length);
               const pimDigits = afterPm.match(/^\d{2}(\d+)/);
@@ -1064,110 +1060,6 @@ function processMhlPastedText() {
 
     if (parsedPlayers.length === 0) {
       alert('Не удалось распознать строки. Проверьте скопированный текст.');
-      return;
-    }
-
-    renderPlayersTable(parsedPlayers);
-    closeMhlPasteModal();
-    alert(`Успешно распознано игроков: ${parsedPlayers.length}`);
-  }
-
-    const parsedPlayers = [];
-    const nameRegex = /([А-ЯЁ][а-яё\-]+(?:\s+[А-ЯЁ][а-яё\-]+|\s+[А-ЯЁ]\.|\s+М\.)*(?:\s*\([КАA-ZА-Я]\))*)/g;
-
-    let cleanText = rawText
-      .replace(/Глоссарий/gi, ' ')
-      .replace(/%ОБ|%ВБР|ВБР|ВВБР|ВП\/И|СМ\/И|СПР|БЛБ|ОТБ|ПХТ/gi, ' ')
-      .replace(/И\s+Ш\s+А\s+О|\+\/-|\bШтр\b|\bВП\b/gi, ' ');
-
-    const rawLines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
-    let pendingNum = null;
-
-    for (let i = 0; i < rawLines.length; i++) {
-      let line = rawLines[i];
-      if (/^(вратари|защитники|нападающие)$/i.test(line)) continue;
-
-      if (/^\d{1,2}$/.test(line)) {
-        pendingNum = line;
-        continue;
-      }
-
-      const match = line.match(/^([А-ЯЁ][а-яё\-]+(?:\s+[А-ЯЁ][а-яё\-]+|\s+[А-ЯЁ]\.|\s+М\.)*(?:\s*\([КАA-ZА-Я]\))*)/);
-      if (match) {
-        const playerName = match[1].trim();
-        const playerNum = pendingNum || '';
-        pendingNum = null;
-
-        const rest = line.substring(match[0].length).trim();
-        let plusMinus = '0';
-        const pmMatch = rest.match(/([+-]\d+)/);
-        if (pmMatch) plusMinus = pmMatch[1];
-
-        const tokens = rest.split(/[\t\s]+/).filter(Boolean);
-        let g = '0', a = '0', pim = '0';
-
-        if (tokens.length >= 4) {
-          g = tokens[1] || '0';
-          a = tokens[2] || '0';
-          pim = tokens[7] || tokens[6] || '0';
-        } else {
-          const digitMatch = rest.match(/^(\d)(\d)(\d)(\d)/);
-          if (digitMatch) {
-            g = digitMatch[2];
-            a = digitMatch[3];
-          }
-        }
-
-        parsedPlayers.push({
-          num: playerNum,
-          name: playerName,
-          g: isNaN(parseInt(g)) ? '0' : g,
-          a: isNaN(parseInt(a)) ? '0' : a,
-          plusMinus: plusMinus,
-          pim: isNaN(parseInt(pim)) ? '0' : pim
-        });
-      }
-    }
-
-    if (parsedPlayers.length === 0) {
-      let m;
-      const matches = [];
-      while ((m = nameRegex.exec(cleanText)) !== null) {
-        matches.push({ name: m[1], index: m.index });
-      }
-
-      for (let k = 0; k < matches.length; k++) {
-        const cur = matches[k];
-        const nextIndex = (k + 1 < matches.length) ? matches[k + 1].index : cleanText.length;
-        const beforeText = cleanText.substring(Math.max(0, cur.index - 15), cur.index);
-        const numMatch = beforeText.match(/(\d{1,2})\s*$/);
-        const playerNum = numMatch ? numMatch[1] : '';
-
-        const afterText = cleanText.substring(cur.index + cur.name.length, nextIndex);
-        let plusMinus = '0';
-        const pmMatch = afterText.match(/([+-]\d+)/);
-        if (pmMatch) plusMinus = pmMatch[1];
-
-        let g = '0', a = '0', pim = '0';
-        const digits = afterText.match(/^(\d)(\d)(\d)(\d)/);
-        if (digits) {
-          g = digits[2];
-          a = digits[3];
-        }
-
-        parsedPlayers.push({
-          num: playerNum,
-          name: cur.name.trim(),
-          g: g,
-          a: a,
-          plusMinus: plusMinus,
-          pim: pim
-        });
-      }
-    }
-
-    if (parsedPlayers.length === 0) {
-      alert('Не удалось распознать строки. Попробуйте выделить только блок игроков.');
       return;
     }
 
