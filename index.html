@@ -1,0 +1,3909 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Хоккейный тактический планшет PRO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Планшет">
+  <!-- Векторный движок Fabric.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <!-- Иконки Phosphor -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Библиотека генерации Word (.docx) и скачивания файлов -->
+  <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <!-- Хранилище IndexedDB без ограничений 5 МБ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0b1120;
+      --panel-bg: #151f32;
+      --border-color: #2b3952;
+      --accent-blue: #38bdf8;
+      --active-btn: #1d4ed8;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      position: relative;
+    }
+    header {
+      background-color: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      flex-shrink: 0;
+      gap: 8px;
+      z-index: 50;
+    }
+    .header-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-blue);
+      white-space: nowrap;
+    }
+    .btn-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    button {
+      background: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 5px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+    }
+    button:hover { background: #334155; }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      background: #1e293b !important;
+      border-color: var(--border-color) !important;
+    }
+    button.active { background: var(--active-btn); border-color: #60a5fa; color: #fff; }
+    button.btn-accent { background: #0284c7; border-color: #38bdf8; }
+    button.btn-accent:hover { background: #0369a1; }
+    button.btn-success { background: #15803d; border-color: #4ade80; }
+    button.btn-success:hover { background: #166534; }
+    button.btn-warning { background: #d97706; border-color: #fbbf24; }
+    button.btn-warning:hover { background: #b45309; }
+    button.btn-secondary { background: #334155; border-color: #475569; }
+    button.btn-secondary:hover { background: #475569; }
+    button.btn-danger { background: #991b1b; border-color: #ef4444; }
+    button.btn-danger:hover { background: #b91c1c; }
+
+    .size-control-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .size-control-container input[type=range] {
+      width: 70px;
+      cursor: pointer;
+    }
+    .size-control-value {
+      font-weight: 700;
+      color: var(--accent-blue);
+      min-width: 26px;
+      text-align: right;
+    }
+
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* БОКОВАЯ ПАНЕЛЬ */
+    .sidebar {
+      width: 290px;
+      background: var(--panel-bg);
+      border-right: 1px solid var(--border-color);
+      padding: 10px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 25;
+      transition: all 0.2s ease;
+    }
+    .sidebar-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-group-trigger {
+      display: none;
+    }
+    .sidebar-group-content {
+      display: block;
+    }
+    .section-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 5px;
+    }
+    .palette-row {
+      display: flex;
+      gap: 8px;
+    }
+    .color-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.15s ease;
+    }
+    .color-swatch.active {
+      border-color: #ffffff;
+      transform: scale(1.15);
+    }
+
+    /* ТУМБЛЕР РЕЖИМА ИГРОКОВ */
+    .toggle-switch-container {
+      display: flex;
+      background: #090e17;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 2px;
+      margin-bottom: 6px;
+      gap: 2px;
+    }
+    .toggle-switch-btn {
+      flex: 1;
+      padding: 4px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 4px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+    .toggle-switch-btn.active {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    /* ОБЛАСТЬ ХОЛСТА */
+    .canvas-container-outer {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #060a12;
+      position: relative;
+      overflow: hidden;
+      padding: 8px;
+      touch-action: none;
+    }
+    .canvas-card {
+      box-shadow: 0 10px 35px rgba(0,0,0,0.7);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #ffffff;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .canvas-card canvas {
+      touch-action: none !important;
+    }
+    .hint-bar {
+      position: absolute;
+      bottom: 8px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 10;
+      text-align: center;
+      max-width: 90%;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    /* ПОЛНОЭКРАННЫЙ РЕЖИМ */
+    body.is-fullscreen header {
+      height: 38px;
+      padding: 2px 8px;
+    }
+    body.is-fullscreen .main-workspace {
+      flex-direction: column;
+    }
+    body.is-fullscreen .sidebar {
+      width: 100%;
+      height: 48px;
+      flex-direction: row;
+      border-right: none;
+      border-top: 1px solid var(--border-color);
+      padding: 4px 8px;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      order: 2;
+      background: var(--panel-bg);
+      z-index: 40;
+    }
+    body.is-fullscreen .canvas-container-outer {
+      order: 1;
+    }
+    body.is-fullscreen .sidebar-group {
+      flex-shrink: 0;
+      display: inline-flex;
+    }
+    body.is-fullscreen .section-title {
+      display: none;
+    }
+    body.is-fullscreen .sidebar-group-trigger {
+      display: inline-flex;
+      font-weight: 600;
+      padding: 7px 11px;
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+    }
+    body.is-fullscreen .sidebar-group-trigger.active-category {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #fff;
+    }
+    body.is-fullscreen .sidebar .sidebar-group-content {
+      display: none !important;
+    }
+
+    .bottom-sheet-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 999999998 !important;
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+      touch-action: none;
+    }
+    .bottom-sheet-overlay.active {
+      display: block;
+    }
+
+    #globalPopoverMenu {
+      display: none;
+      position: fixed;
+      background: #151f32;
+      border: 1px solid var(--accent-blue);
+      box-shadow: 0 16px 45px rgba(0,0,0,0.98);
+      z-index: 999999999 !important;
+    }
+    #globalPopoverMenu.mode-android-popover {
+      border-radius: 10px;
+      padding: 10px;
+      min-width: 230px;
+      white-space: nowrap;
+    }
+    #globalPopoverMenu.mode-android-popover.active {
+      display: block;
+      animation: popIn 0.15s ease-out;
+    }
+    #globalPopoverMenu.mode-android-popover::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: var(--arrow-left, 50%);
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid var(--accent-blue);
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #globalPopoverMenu.mode-ios-sheet {
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      border-left: none;
+      border-right: none;
+      border-bottom: none;
+      border-top: 2px solid var(--accent-blue);
+      border-radius: 16px 16px 0 0;
+      padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)) 16px;
+      transform: translateY(100%);
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 60vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #globalPopoverMenu.mode-ios-sheet::after {
+      display: none;
+    }
+    #globalPopoverMenu.mode-ios-sheet.active {
+      display: block;
+      transform: translateY(0);
+    }
+    #globalPopoverMenu.mode-ios-sheet .tools-grid {
+      grid-template-columns: repeat(3, 1fr) !important;
+      gap: 8px !important;
+    }
+    #globalPopoverMenu.mode-ios-sheet button {
+      padding: 11px 8px !important;
+      font-size: 12px !important;
+      justify-content: center !important;
+    }
+    #globalPopoverMenu.mode-ios-sheet .palette-row {
+      justify-content: space-around;
+      padding: 6px 0;
+    }
+    #globalPopoverMenu.mode-ios-sheet .color-swatch {
+      width: 34px;
+      height: 34px;
+    }
+
+    .tracing-floating-bar {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(21, 31, 50, 0.95);
+      border: 1px solid var(--accent-blue);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 20;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      width: 260px;
+    }
+    .tracing-floating-bar.active {
+      display: flex;
+    }
+    .tracing-floating-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-blue);
+    }
+    .tracing-slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .tracing-slider-row input[type=range] {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    /* МОДАЛЬНЫЕ ОКНА */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000000;
+    }
+    #imagePreviewModal {
+      z-index: 20000000 !important;
+      background: rgba(0, 0, 0, 0.9) !important;
+    }
+
+    .modal-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      width: 840px;
+      max-width: 96vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-body {
+      padding: 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* СЕКЦИЯ ОЧЕРЕДИ ВЫБРАННЫХ УПРАЖНЕНИЙ */
+    .selected-queue-container {
+      background: #090e17;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .selected-queue-track {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      -webkit-overflow-scrolling: touch;
+      min-height: 120px;
+      align-items: center;
+    }
+    .queue-card {
+      flex: 0 0 140px;
+      background: #1e293b;
+      border: 1px solid var(--accent-blue);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .queue-card img {
+      width: 100%;
+      height: 70px;
+      object-fit: cover;
+      background: #fff;
+    }
+    .queue-card-body {
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .queue-order-badge {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      background: #0284c7;
+      color: #fff;
+      font-size: 10px;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 10px;
+    }
+    .queue-controls {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .queue-controls button {
+      padding: 3px 6px;
+      font-size: 10px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .drills-grid-selectable {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .drill-item {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .drill-item:hover { border-color: var(--accent-blue); }
+    .drill-item img {
+      width: 100%;
+      height: 90px;
+      object-fit: cover;
+      background: #fff;
+      cursor: pointer;
+    }
+    .drill-item-info {
+      padding: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge-order {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      background: #0284c7;
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+    .badge-half {
+      position: absolute;
+      bottom: 28px;
+      left: 6px;
+      background: rgba(30, 41, 59, 0.9);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+      font-weight: 600;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .btn-select-plus {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--accent-blue);
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+      color: #fff;
+      transition: transform 0.15s ease;
+    }
+    .btn-select-plus.selected {
+      background: #0284c7;
+      border-color: #fff;
+      transform: scale(1.1);
+    }
+    .btn-preview-zoom {
+      position: absolute;
+      top: 6px;
+      right: 36px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border-color);
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      cursor: pointer;
+      color: #fff;
+      transition: transform 0.15s ease;
+      z-index: 5;
+    }
+    .btn-preview-zoom:hover { background: #334155; }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 10px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: var(--accent-blue); }
+
+    .filter-bar-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .search-input-box {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+    }
+    .search-input-box:focus { border-color: var(--accent-blue); }
+    .select-sort-box {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .header-title span {
+        display: none;
+      }
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+      .tracing-floating-bar {
+        top: 50px;
+        right: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <i class="ph-bold ph-hockey-puck" style="font-size: 20px;"></i>
+    <span>Хоккейный планшет</span>
+  </div>
+  <div class="btn-group">
+    <button id="btnUndo" onclick="undo()" title="Отменить действие (Ctrl+Z)">
+      <i class="ph ph-arrow-counter-clockwise"></i>
+    </button>
+    <button id="btnRedo" onclick="redo()" title="Повторить действие (Ctrl+Y)">
+      <i class="ph ph-arrow-clockwise"></i>
+    </button>
+
+    <button id="btnFullScreenToggle" onclick="toggleFullScreen()" title="Развернуть на весь экран"><i class="ph-bold ph-corners-out"></i></button>
+
+    <div class="size-control-container" title="Масштаб объектов и линий">
+      <i class="ph-bold ph-ruler" style="color:var(--accent-blue);"></i>
+      <input type="range" id="objectScaleSlider" min="0.5" max="2.5" step="0.1" value="1.0" oninput="handleScaleSliderChange(this.value)">
+      <span class="size-control-value" id="objectScaleLabel">1.0x</span>
+    </div>
+
+    <button class="btn-secondary" onclick="exportDatabaseJSON()" title="Поделиться или скачать файл базы схем">
+      <i class="ph-bold ph-share-network"></i> Резерв
+    </button>
+    <input type="file" id="importDatabaseInput" accept=".json" style="display:none;" onchange="importDatabaseJSON(event)">
+    <button class="btn-secondary" onclick="document.getElementById('importDatabaseInput').click()" title="Импортировать и объединить базы">
+      <i class="ph-bold ph-file-arrow-up"></i>
+    </button>
+
+    <button id="btnDeleteSelected" class="btn-danger" onclick="deleteActiveObject()" title="Удалить выбранное (Delete)"><i class="ph ph-trash"></i></button>
+    <button id="btnOpenHistory" onclick="openHistoryModal()"><i class="ph ph-folder"></i> Схемы</button>
+    
+    <input type="file" id="uploadDrillImageInput" accept="image/png, image/jpeg, image/jpg, image/webp" multiple style="display:none;" onchange="handleMultipleDrillsUpload(event)">
+    <button class="btn-secondary" onclick="document.getElementById('uploadDrillImageInput').click()" title="Загрузить схемы с ПК">
+      <i class="ph-bold ph-images"></i> + Схемы с ПК
+    </button>
+
+    <input type="file" id="tracingFileInput" accept="image/*" style="display:none;" onchange="handleTracingUpload(event)">
+    <button id="btnTracingToggle" class="btn-warning" onclick="openTracingUploader()" title="Калька для срисовки">
+      <i class="ph-bold ph-copy"></i> Калька
+    </button>
+
+    <button id="btnOpenWorkoutBuilder" class="btn-success" onclick="openWorkoutBuilderModal()"><i class="ph-bold ph-clipboard-text"></i> Создать тренировку</button>
+    <button class="btn-accent" onclick="saveToLibrary()"><i class="ph ph-floppy-disk"></i> Сохранить</button>
+    <button class="btn-accent" onclick="exportImage()"><i class="ph ph-download-simple"></i> PNG</button>
+    <button class="btn-danger" onclick="clearCanvas()" title="Сбросить поле"><i class="ph ph-arrows-counter-clockwise"></i></button>
+  </div>
+</header>
+
+<div class="main-workspace">
+  <aside class="sidebar" id="mainSidebar">
+    <!-- Группа 1: Площадка -->
+    <div class="sidebar-group" id="grpRink">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpRink', event)"><i class="ph ph-bounding-box"></i> Поле</button>
+      <div class="sidebar-group-content" data-for="grpRink">
+        <div class="section-title">Разметка площадки</div>
+        <div class="tools-grid">
+          <button id="btnFullRink" class="active" onclick="setRinkPreset('full'); closeContextPopover();">Всё поле</button>
+          <button id="btnHalfRink" onclick="setRinkPreset('half'); closeContextPopover();">1/2 Поля</button>
+          <button id="btnNeutralZone" style="grid-column: span 2;" onclick="setRinkPreset('neutral_zone'); closeContextPopover();">Средняя зона</button>
+        </div>
+        <input type="file" id="bgUpload" accept="image/*" style="display:none" onchange="uploadCustomBg(event); closeContextPopover();">
+        <button style="width: 100%; margin-top: 5px;" onclick="document.getElementById('bgUpload').click()">
+          <i class="ph ph-upload-simple"></i> + Загрузить своё фото льда
+        </button>
+        <div id="customBgsContainer" style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Сохранённые фото льда:</div>
+          <div style="display: flex; gap: 4px;">
+            <select id="customBgSelect" class="select-sort-box" style="flex: 1; font-size: 11px; padding: 4px 6px;" onchange="applyCustomBgFromSelect(this.value)">
+              <option value="">-- Выберите свой фон --</option>
+            </select>
+            <button class="btn-danger" style="padding: 4px 7px;" onclick="deleteSelectedCustomBg()" title="Удалить выбранный фон">
+              <i class="ph ph-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Группа 2: Инструменты -->
+    <div class="sidebar-group" id="grpTools">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpTools', event)"><i class="ph ph-paint-brush"></i> Инструменты</button>
+      <div class="sidebar-group-content" data-for="grpTools">
+        <div class="section-title">Инструменты</div>
+        <div class="tools-grid">
+          <button id="toolSelect" class="tool-btn active" onclick="setTool('select'); closeContextPopover();"><i class="ph ph-cursor"></i> Выбор</button>
+          <button id="toolBrush" class="tool-btn" onclick="setTool('brush'); closeContextPopover();"><i class="ph ph-paint-brush"></i> Кисть</button>
+          <button id="toolStraightArrow" class="tool-btn" onclick="setTool('straightArrow'); closeContextPopover();"><i class="ph ph-arrow-up-right"></i> Прямая</button>
+          <button id="toolEraser" class="tool-btn" onclick="setTool('eraser'); closeContextPopover();"><i class="ph ph-eraser"></i> Ластик</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Группа 3: Катание -->
+    <div class="sidebar-group" id="grpSkating">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpSkating', event)"><i class="ph ph-path"></i> Катание</button>
+      <div class="sidebar-group-content" data-for="grpSkating">
+        <div class="section-title">Катание</div>
+        <div class="tools-grid">
+          <button id="pat_forward" class="pattern-btn active" onclick="setPattern('forward'); closeContextPopover();">Лицом вперёд</button>
+          <button id="pat_forward_puck" class="pattern-btn" onclick="setPattern('forward_puck'); closeContextPopover();">Ведение вперёд</button>
+          <button id="pat_backward" class="pattern-btn" onclick="setPattern('backward'); closeContextPopover();">Спиной вперёд</button>
+          <button id="pat_backward_puck" class="pattern-btn" onclick="setPattern('backward_puck'); closeContextPopover();">Ведение спиной</button>
+          <button id="pat_lateral" class="pattern-btn" onclick="setPattern('lateral'); closeContextPopover();">Приставной шаг</button>
+          <button id="pat_butterfly" class="pattern-btn" onclick="setPattern('butterfly'); closeContextPopover();">Слайд вратаря</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Группа 4: Работа с шайбой -->
+    <div class="sidebar-group" id="grpPuck">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpPuck', event)"><i class="ph ph-arrows-left-right"></i> Пас / Бросок</button>
+      <div class="sidebar-group-content" data-for="grpPuck">
+        <div class="section-title">Работа с шайбой</div>
+        <div class="tools-grid">
+          <button id="pat_passing" class="pattern-btn" onclick="setPattern('passing'); closeContextPopover();">Передача (пас)</button>
+          <button id="pat_shooting" class="pattern-btn" onclick="setPattern('shooting'); closeContextPopover();">Бросок</button>
+          <button id="pat_pucks_line" class="pattern-btn" style="grid-column: span 2;" onclick="setPattern('pucks_line'); closeContextPopover();">Линия шайб (• • •)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Группа 5: Концовка линии -->
+    <div class="sidebar-group" id="grpEnding">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpEnding', event)"><i class="ph ph-arrow-fat-lines-right"></i> Концовка</button>
+      <div class="sidebar-group-content" data-for="grpEnding">
+        <div class="section-title">Концовка линии</div>
+        <div class="tools-grid">
+          <button id="end_none" class="ending-btn" onclick="setEnding('none'); closeContextPopover();">Нет</button>
+          <button id="end_arrow" class="ending-btn active" onclick="setEnding('arrow'); closeContextPopover();"><i class="ph ph-caret-right"></i> Стрелка</button>
+          <button id="end_stop" class="ending-btn" onclick="setEnding('stop'); closeContextPopover();"><i class="ph ph-pause"></i> Тормоз (||)</button>
+          <button id="end_dot" class="ending-btn" onclick="setEnding('dot'); closeContextPopover();"><i class="ph ph-circle"></i> Точка (●)</button>
+          <button id="end_right_pivot" class="ending-btn" onclick="setEnding('right_pivot'); closeContextPopover();"><i class="ph ph-arrow-u-down-right"></i> Улитка R</button>
+          <button id="end_left_pivot" class="ending-btn" onclick="setEnding('left_pivot'); closeContextPopover();"><i class="ph ph-arrow-u-down-left"></i> Улитка L</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Группа 6: Цвет -->
+    <div class="sidebar-group" id="grpColor">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpColor', event)"><i class="ph ph-palette"></i> Цвет</button>
+      <div class="sidebar-group-content" data-for="grpColor">
+        <div class="section-title">Цвет маркера</div>
+        <div class="palette-row">
+          <div class="color-swatch active" style="background:#0f172a;" onclick="setColor('#0f172a', this); closeContextPopover();"></div>
+          <div class="color-swatch" style="background:#dc2626;" onclick="setColor('#dc2626', this); closeContextPopover();"></div>
+          <div class="color-swatch" style="background:#2563eb;" onclick="setColor('#2563eb', this); closeContextPopover();"></div>
+          <div class="color-swatch" style="background:#16a34a;" onclick="setColor('#16a34a', this); closeContextPopover();"></div>
+          <div class="color-swatch" style="background:#ea580c;" onclick="setColor('#ea580c', this); closeContextPopover();"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Группа 7: Игроки и инвентарь -->
+    <div class="sidebar-group" id="grpEquipment">
+      <button class="sidebar-group-trigger" onclick="toggleSidebarGroup('grpEquipment', event)"><i class="ph ph-users-three"></i> Инвентарь</button>
+      <div class="sidebar-group-content" data-for="grpEquipment">
+        <div class="section-title">Игроки и инвентарь</div>
+        
+        <!-- ТУМБЛЕР ВАРИАЦИЙ ИГРОКОВ -->
+        <div class="toggle-switch-container" title="Переключение режима нумерации">
+          <button id="playerModeStamp" class="toggle-switch-btn active" onclick="setPlayerStampMode('stamp'); event.stopPropagation();">
+            Авто № (1, 2..)
+          </button>
+          <button id="playerModeCustom" class="toggle-switch-btn" onclick="setPlayerStampMode('custom'); event.stopPropagation();">
+            Свой текст (F, D..)
+          </button>
+        </div>
+
+        <div class="tools-grid">
+          <button id="btnPlaceF" class="place-btn" onclick="preparePlacement('player', {role:'F'}, this); closeContextPopover();">Атака F</button>
+          <button id="btnPlaceD" class="place-btn" onclick="preparePlacement('player', {role:'D'}, this); closeContextPopover();">Защита D</button>
+          <button id="btnPlaceG" class="place-btn" onclick="preparePlacement('player', {role:'G', color:'#16a34a'}, this); closeContextPopover();">Вратарь G</button>
+          <button id="btnPlaceCoach" class="place-btn" onclick="preparePlacement('coach', {}, this); closeContextPopover();">Тренер (C)</button>
+          <button id="btnPlaceCross" class="place-btn" onclick="preparePlacement('cross', {}, this); closeContextPopover();">Крестик (✕)</button>
+          <button id="btnPlaceRing" class="place-btn" onclick="preparePlacement('ring', {}, this); closeContextPopover();">Кружок (○)</button>
+          <button id="btnPlacePuck" class="place-btn" onclick="preparePlacement('puck', {}, this); closeContextPopover();">Шайба</button>
+          <button id="btnPlaceCone" class="place-btn" onclick="preparePlacement('cone', {}, this); closeContextPopover();">Конус</button>
+          <button id="btnPlaceGoal" class="place-btn" style="grid-column: span 2;" onclick="preparePlacement('goal', {}, this); closeContextPopover();">Ворота</button>
+        </div>
+        <button id="btnPlaceText" class="place-btn" style="width:100%; margin-top: 5px;" onclick="preparePlacement('text', {}, this); closeContextPopover();">
+          <i class="ph ph-text-t"></i> Текст / Инструкция
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="canvas-container-outer" id="canvasOuter">
+    <div class="tracing-floating-bar" id="tracingFloatingBar">
+      <div class="tracing-floating-header">
+        <span><i class="ph-bold ph-copy"></i> Настройки кальки</span>
+        <button onclick="toggleTracingPanel(false)" style="padding:2px 6px; font-size:10px;"><i class="ph ph-x"></i></button>
+      </div>
+      <div class="tracing-slider-row">
+        <span>Прозрачность:</span>
+        <input type="range" id="tracingOpacitySlider" min="0.1" max="1" step="0.05" value="0.45" oninput="updateTracingOpacity(this.value)">
+        <span id="tracingOpacityValue">45%</span>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button id="btnLockTracing" onclick="toggleTracingLock()" style="flex:1;"><i class="ph ph-lock-key"></i> Закрепить</button>
+        <button class="btn-danger" onclick="removeTracing()" style="flex:1;"><i class="ph ph-trash"></i> Удалить</button>
+      </div>
+    </div>
+
+    <div class="canvas-card" id="canvasCard">
+      <canvas id="rinkCanvas"></canvas>
+    </div>
+    <div class="hint-bar" id="hintBar">Выберите инструмент или кликните по объекту для перемещения</div>
+  </main>
+</div>
+
+<!-- ПОДЛОЖКА И ЕДИНОЕ МЕНЮ -->
+<div id="popoverOverlay" class="bottom-sheet-overlay" onclick="closeContextPopover()"></div>
+<div id="globalPopoverMenu"></div>
+
+<!-- МОДАЛЬНОЕ ОКНО: БИБЛИОТЕКА СХЕМ -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 style="font-size:15px;">Библиотека схем и упражнений</h3>
+      <button onclick="closeHistoryModal()" style="font-size: 14px; font-weight: bold; cursor: pointer; padding: 4px 8px;"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body" style="gap: 10px;">
+      <div class="filter-bar-row">
+        <input type="text" id="librarySearchInput" class="search-input-box" placeholder="🔍 Поиск схемы по названию..." oninput="renderLibraryModalGrid()">
+        <select id="librarySortSelect" class="select-sort-box" onchange="renderLibraryModalGrid()">
+          <option value="newest">Сначала новые</option>
+          <option value="oldest">Сначала старые</option>
+          <option value="title">По названию (А-Я)</option>
+        </select>
+      </div>
+      <div class="drills-grid-selectable" id="savedDrillsList" style="max-height: 480px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО: ПРЕВЬЮ СХЕМЫ -->
+<div class="modal-overlay" id="imagePreviewModal">
+  <div class="modal-card" style="width: 760px; align-items: center; padding: 15px;">
+    <div class="modal-header" style="width: 100%; border-bottom: none; padding-bottom: 0;">
+      <h3 id="previewModalTitle" style="font-size: 16px; color: var(--accent-blue);">Предпросмотр</h3>
+      <button onclick="closeImagePreview()"><i class="ph ph-x"></i></button>
+    </div>
+    <div style="width: 100%; display: flex; justify-content: center; align-items: center; margin-top: 10px; background: #fff; border-radius: 8px; overflow: hidden; padding: 10px;">
+      <img id="previewModalImg" src="" style="max-width: 100%; max-height: 72vh; object-fit: contain;">
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО: КОНСТРУКТОР ТРЕНИРОВКИ (DOCX) -->
+<div class="modal-overlay" id="workoutBuilderModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 style="font-size:15px; display:flex; align-items:center; gap:8px;">
+        <i class="ph-bold ph-file-doc" style="color:var(--accent-blue);"></i> Конструктор конспекта тренировки (Word DOCX)
+      </h3>
+      <button onclick="closeWorkoutBuilderModal()"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Тема / Название тренировки</label>
+          <input type="text" id="workoutTitleInput" value="Лед утро 27.07.26">
+        </div>
+        <div class="form-group">
+          <label>Время проведения</label>
+          <input type="text" id="workoutTimeInput" value="8.45-10.15">
+        </div>
+        <div class="form-group">
+          <label>Продолжительность</label>
+          <input type="text" id="workoutDurationInput" value="90 минут">
+        </div>
+      </div>
+
+      <!-- ВЫДЕЛЕННЫЙ БЛОК: ОЧЕРЕДЬ ВЫБРАННЫХ СХЕМ С ИЗМЕНЕНИЕМ ПОРЯДКА -->
+      <div class="selected-queue-container" id="workoutQueueContainer" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:11px; font-weight:700; color:var(--accent-blue); text-transform:uppercase;">
+            <i class="ph-bold ph-list-numbers"></i> Очередь упражнений в тренировке (порядок в Word)
+          </span>
+          <span style="font-size:11px; color:var(--text-muted);" id="queueCountLabel">0 шт.</span>
+        </div>
+        <div class="selected-queue-track" id="selectedQueueTrack"></div>
+      </div>
+
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+          <div class="section-title" style="margin-bottom:0;">Каталог упражнений (нажмите «+» чтобы добавить в очередь)</div>
+        </div>
+        <div class="filter-bar-row" style="margin-bottom: 6px;">
+          <input type="text" id="drillSearchInput" class="search-input-box" placeholder="🔍 Поиск по названию схемы..." oninput="filterDrillsGrid()">
+          <select id="workoutSortSelect" class="select-sort-box" onchange="filterDrillsGrid()">
+            <option value="newest">Сначала новые</option>
+            <option value="oldest">Сначала старые</option>
+            <option value="title">По названию (А-Я)</option>
+          </select>
+        </div>
+        <div class="drills-grid-selectable" id="workoutSelectableGrid"></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:12px;">
+        <div style="font-size:12px; color:var(--text-muted);" id="selectedCountLabel">Выбрано упражнений: 0</div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="closeWorkoutBuilderModal()">Отмена</button>
+          <button id="btnGenerateDocx" class="btn-success" onclick="generateWordDocument()"><i class="ph-bold ph-download"></i> Собрать и скачать DOCX</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  localforage.config({
+    name: 'HockeyTacticsPro',
+    storeName: 'hockey_app_store',
+    description: 'Надежное неограниченное хранилище схем и изображений'
+  });
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  const VIRTUAL_WIDTH_FULL = 1100;
+  const VIRTUAL_WIDTH_HALF = 550;
+  const VIRTUAL_HEIGHT = 580;
+
+  let currentVirtualWidth = VIRTUAL_WIDTH_FULL;
+
+  const canvas = new fabric.Canvas('rinkCanvas', {
+    selection: true,
+    preserveObjectStacking: true,
+    allowTouchScrolling: false
+  });
+
+  let currentTool = 'select';
+  let currentColor = '#0f172a';
+  let currentPattern = 'forward';
+  let currentEnding = 'arrow';
+  let strokeWidth = 3;
+  let currentRinkType = 'full';
+
+  let playerStampMode = 'stamp';
+
+  let globalObjectScale = 1.0;
+
+  let undoHistory = [];
+  let redoHistory = [];
+  let isStateChanging = false;
+
+  let placementItem = null;
+  let isMouseDown = false;
+  let rawPoints = [];
+  let livePreviewLine = null;
+  let straightLine = null;
+
+  let selectedWorkoutDrills = [];
+
+  let tracingObject = null;
+  let isTracingLocked = false;
+
+  let currentActiveGroupId = null;
+
+  let activeControlLine = null;
+  let activeControlHandles = [];
+  let draggingMidData = null;
+
+  async function getDrills() {
+    let drills = await localforage.getItem('hockey_pro_drills');
+    if (!drills) {
+      try {
+        const legacy = JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]');
+        if (Array.isArray(legacy) && legacy.length > 0) {
+          drills = legacy;
+          await localforage.setItem('hockey_pro_drills', drills);
+        }
+      } catch (e) {}
+    }
+    if (!drills) drills = [];
+    drills.forEach(d => {
+      if (!d.createdAt) d.createdAt = d.id || 0;
+    });
+    return drills;
+  }
+
+  async function saveDrills(drills) {
+    return await localforage.setItem('hockey_pro_drills', drills);
+  }
+
+  async function getCustomBgs() {
+    let bgs = await localforage.getItem('hockey_custom_bgs');
+    if (!bgs) {
+      try {
+        const legacy = JSON.parse(localStorage.getItem('hockey_custom_bgs') || '[]');
+        if (Array.isArray(legacy) && legacy.length > 0) {
+          bgs = legacy;
+          await localforage.setItem('hockey_custom_bgs', bgs);
+        }
+      } catch (e) {}
+    }
+    return bgs || [];
+  }
+
+  async function saveCustomBgs(bgs) {
+    return await localforage.setItem('hockey_custom_bgs', bgs);
+  }
+
+  function setPlayerStampMode(mode) {
+    playerStampMode = mode;
+    const btnStamp = document.getElementById('playerModeStamp');
+    const btnCustom = document.getElementById('playerModeCustom');
+    if (btnStamp) btnStamp.classList.toggle('active', mode === 'stamp');
+    if (btnCustom) btnCustom.classList.toggle('active', mode === 'custom');
+  }
+
+  function clearLineHandles() {
+    if (draggingMidData) {
+      if (draggingMidData.fixedDot) canvas.remove(draggingMidData.fixedDot);
+      if (draggingMidData.guideLine) canvas.remove(draggingMidData.guideLine);
+      draggingMidData = null;
+    }
+    if (activeControlHandles.length > 0) {
+      activeControlHandles.forEach(h => canvas.remove(h));
+      activeControlHandles = [];
+    }
+    activeControlLine = null;
+    canvas.requestRenderAll();
+  }
+
+  function buildTrajectoryGroup(pts, pat, clr, end) {
+    const { svg, dots } = generateHockeyTacticalSVG(pts, pat);
+    const lineObj = new fabric.Path(svg, {
+      stroke: clr,
+      strokeWidth: (pat === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
+      strokeDashArray: getStrokeDashForPattern(pat),
+      fill: 'transparent',
+      strokeLineCap: 'round',
+      strokeLineJoin: 'round'
+    });
+
+    const items = [lineObj];
+    dots.forEach(d => {
+      items.push(new fabric.Circle({
+        left: d.x, top: d.y, radius: 2.6 * globalObjectScale, fill: clr, originX: 'center', originY: 'center'
+      }));
+    });
+
+    const finePts = getSampledCurvePoints(pts);
+    const pLast = finePts[finePts.length - 1];
+    const pPrev = finePts[Math.max(0, finePts.length - 3)] || finePts[0];
+    const angle = Math.atan2(pLast.y - pPrev.y, pLast.x - pPrev.x) * (180 / Math.PI);
+
+    const prevEnding = currentEnding;
+    const prevColor = currentColor;
+    currentEnding = end;
+    currentColor = clr;
+    const marker = createTacticalEnding(pLast.x, pLast.y, angle);
+    currentEnding = prevEnding;
+    currentColor = prevColor;
+
+    if (marker) items.push(marker);
+
+    const group = new fabric.Group(items, {
+      selectable: true,
+      hasControls: false,
+      hasBorders: false,
+      customType: 'tactical_trajectory',
+      controlPoints: pts.map(p => ({ x: p.x, y: p.y })),
+      linePattern: pat,
+      lineColor: clr,
+      lineEnding: end
+    });
+    return group;
+  }
+
+  function renderLineHandles(groupObj) {
+    clearLineHandles();
+    if (!groupObj || !groupObj.controlPoints || groupObj.controlPoints.length < 2) return;
+
+    activeControlLine = groupObj;
+    const pts = groupObj.controlPoints;
+
+    pts.forEach((pt, idx) => {
+      const handle = new fabric.Circle({
+        left: pt.x,
+        top: pt.y,
+        radius: 6 * globalObjectScale,
+        fill: '#38bdf8',
+        stroke: '#ffffff',
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center',
+        hasControls: false,
+        hasBorders: false,
+        selectable: true,
+        hoverCursor: 'move',
+        isControlHandle: true,
+        pointIndex: idx,
+        isMidpoint: false
+      });
+      activeControlHandles.push(handle);
+      canvas.add(handle);
+      handle.bringToFront();
+    });
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const midX = (pts[i].x + pts[i + 1].x) / 2;
+      const midY = (pts[i].y + pts[i + 1].y) / 2;
+
+      const midHandle = new fabric.Circle({
+        left: midX,
+        top: midY,
+        radius: 5 * globalObjectScale,
+        fill: '#facc15',
+        stroke: '#ffffff',
+        strokeWidth: 1.5,
+        originX: 'center',
+        originY: 'center',
+        hasControls: false,
+        hasBorders: false,
+        selectable: true,
+        hoverCursor: 'pointer',
+        isControlHandle: true,
+        segIndex: i,
+        isMidpoint: true
+      });
+      midHandle.origMidX = midX;
+      midHandle.origMidY = midY;
+
+      activeControlHandles.push(midHandle);
+      canvas.add(midHandle);
+      midHandle.bringToFront();
+    }
+    canvas.requestRenderAll();
+  }
+
+  function updateTacticalGroupFromPoints(groupObj) {
+    if (!groupObj || !groupObj.controlPoints) return;
+    const pts = groupObj.controlPoints;
+    const pat = groupObj.linePattern || currentPattern;
+    const clr = groupObj.lineColor || currentColor;
+    const end = groupObj.lineEnding || currentEnding;
+
+    const { svg, dots } = generateHockeyTacticalSVG(pts, pat);
+    const lineObj = new fabric.Path(svg, {
+      stroke: clr,
+      strokeWidth: (pat === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
+      strokeDashArray: getStrokeDashForPattern(pat),
+      fill: 'transparent',
+      strokeLineCap: 'round',
+      strokeLineJoin: 'round'
+    });
+
+    const items = [lineObj];
+    dots.forEach(d => {
+      items.push(new fabric.Circle({
+        left: d.x, top: d.y, radius: 2.6 * globalObjectScale, fill: clr, originX: 'center', originY: 'center'
+      }));
+    });
+
+    const finePts = getSampledCurvePoints(pts);
+    const pLast = finePts[finePts.length - 1];
+    const pPrev = finePts[Math.max(0, finePts.length - 3)] || finePts[0];
+    const angle = Math.atan2(pLast.y - pPrev.y, pLast.x - pPrev.x) * (180 / Math.PI);
+
+    const prevEnding = currentEnding;
+    const prevColor = currentColor;
+    currentEnding = end;
+    currentColor = clr;
+    const marker = createTacticalEnding(pLast.x, pLast.y, angle);
+    currentEnding = prevEnding;
+    currentColor = prevColor;
+
+    if (marker) items.push(marker);
+
+    while (groupObj.size() > 0) {
+      groupObj.remove(groupObj.item(0));
+    }
+    items.forEach(it => groupObj.addWithUpdate(it));
+    groupObj.set({
+      hasControls: false,
+      hasBorders: false
+    });
+    groupObj.setCoords();
+
+    if (draggingMidData) {
+      if (draggingMidData.fixedDot) draggingMidData.fixedDot.bringToFront();
+      if (draggingMidData.guideLine) canvas.bringToFront(draggingMidData.guideLine);
+    }
+    canvas.requestRenderAll();
+  }
+
+  function closeContextPopover() {
+    const popover = document.getElementById('globalPopoverMenu');
+    const overlay = document.getElementById('popoverOverlay');
+    if (!popover) return;
+    
+    if (currentActiveGroupId) {
+      const originalContainer = document.querySelector(`.sidebar-group-content[data-for="${currentActiveGroupId}"]`);
+      if (originalContainer) {
+        while (popover.firstChild) {
+          originalContainer.appendChild(popover.firstChild);
+        }
+      }
+      const trigger = document.querySelector(`#${currentActiveGroupId} .sidebar-group-trigger`);
+      if (trigger) trigger.classList.remove('active-category');
+      currentActiveGroupId = null;
+    }
+    
+    popover.classList.remove('active');
+    setTimeout(() => {
+      if (!currentActiveGroupId) popover.style.display = 'none';
+    }, isIOS ? 220 : 50);
+
+    if (overlay) overlay.classList.remove('active');
+  }
+
+  function toggleSidebarGroup(groupId, e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!document.body.classList.contains('is-fullscreen')) return;
+
+    const popover = document.getElementById('globalPopoverMenu');
+    const overlay = document.getElementById('popoverOverlay');
+    const targetGroup = document.getElementById(groupId);
+    if (!targetGroup || !popover) return;
+
+    const triggerBtn = targetGroup.querySelector('.sidebar-group-trigger');
+    const contentBlock = targetGroup.querySelector('.sidebar-group-content');
+
+    if (currentActiveGroupId === groupId) {
+      closeContextPopover();
+      return;
+    }
+
+    closeContextPopover();
+
+    currentActiveGroupId = groupId;
+    if (triggerBtn) triggerBtn.classList.add('active-category');
+
+    while (contentBlock.firstChild) {
+      popover.appendChild(contentBlock.firstChild);
+    }
+
+    if (isIOS) {
+      popover.className = 'mode-ios-sheet';
+      if (overlay) overlay.classList.add('active');
+      popover.style.display = 'block';
+      setTimeout(() => popover.classList.add('active'), 10);
+    } else {
+      popover.className = 'mode-android-popover';
+      const btnRect = triggerBtn.getBoundingClientRect();
+      const popoverWidth = 230;
+
+      let leftPos = btnRect.left + (btnRect.width / 2) - (popoverWidth / 2);
+      if (leftPos < 8) leftPos = 8;
+      if (leftPos + popoverWidth > window.innerWidth - 8) {
+        leftPos = window.innerWidth - popoverWidth - 8;
+      }
+
+      const bottomOffset = window.innerHeight - btnRect.top + 8;
+      popover.style.left = `${leftPos}px`;
+      popover.style.bottom = `${bottomOffset}px`;
+
+      const arrowOffset = Math.max(14, Math.min(popoverWidth - 14, (btnRect.left + btnRect.width / 2) - leftPos));
+      popover.style.setProperty('--arrow-left', `${arrowOffset}px`);
+
+      popover.style.display = 'block';
+      popover.classList.add('active');
+    }
+  }
+
+  function toggleFullScreen() {
+    const canRequestFS = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+    const isFS = document.fullscreenElement || document.webkitFullscreenElement;
+
+    if (!isFS && !document.body.classList.contains('is-fullscreen')) {
+      if (canRequestFS) {
+        try {
+          const req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+          req.call(document.documentElement).catch(() => {});
+        } catch (e) {}
+      }
+      document.body.classList.add('is-fullscreen');
+    } else {
+      if (isFS) {
+        try {
+          const exit = document.exitFullscreen || document.webkitExitFullscreen;
+          if (exit) exit.call(document).catch(() => {});
+        } catch (e) {}
+      }
+      document.body.classList.remove('is-fullscreen');
+      closeContextPopover();
+    }
+    setTimeout(resizeCanvasToFit, 150);
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+      document.body.classList.remove('is-fullscreen');
+      closeContextPopover();
+      setTimeout(resizeCanvasToFit, 100);
+    } else {
+      document.body.classList.add('is-fullscreen');
+      setTimeout(resizeCanvasToFit, 100);
+    }
+  });
+
+  document.addEventListener('webkitfullscreenchange', () => {
+    if (!document.webkitFullscreenElement) {
+      document.body.classList.remove('is-fullscreen');
+      closeContextPopover();
+      setTimeout(resizeCanvasToFit, 100);
+    } else {
+      document.body.classList.add('is-fullscreen');
+      setTimeout(resizeCanvasToFit, 100);
+    }
+  });
+
+  document.addEventListener('pointerdown', (e) => {
+    if (!isIOS && document.body.classList.contains('is-fullscreen')) {
+      const popover = document.getElementById('globalPopoverMenu');
+      const sidebar = document.getElementById('mainSidebar');
+      if (popover && popover.classList.contains('active')) {
+        if (!popover.contains(e.target) && (!sidebar || !sidebar.contains(e.target))) {
+          setTimeout(closeContextPopover, 10);
+        }
+      }
+    }
+  });
+
+  document.getElementById('globalPopoverMenu').addEventListener('pointerdown', (e) => e.stopPropagation());
+  document.getElementById('globalPopoverMenu').addEventListener('click', (e) => e.stopPropagation());
+
+  function handleScaleSliderChange(val) {
+    globalObjectScale = parseFloat(val);
+    document.getElementById('objectScaleLabel').textContent = `${globalObjectScale.toFixed(1)}x`;
+    strokeWidth = Math.max(1.5, Math.round(3 * globalObjectScale));
+
+    const activeObjs = canvas.getActiveObjects ? canvas.getActiveObjects() : [canvas.getActiveObject()];
+    activeObjs.forEach(activeObj => {
+      if (activeObj && activeObj.name !== 'rink_bg' && activeObj !== tracingObject) {
+        if (activeObj.type === 'group' && activeObj.customType === 'tactical_trajectory') {
+          activeObj.forEachObject(subObj => {
+            if (subObj.type === 'path' || subObj.type === 'line' || subObj.type === 'polyline') {
+              subObj.set('strokeWidth', strokeWidth);
+            }
+          });
+        } else {
+          activeObj.set({
+            scaleX: globalObjectScale,
+            scaleY: globalObjectScale
+          });
+        }
+      }
+    });
+    canvas.requestRenderAll();
+    saveState();
+  }
+
+  function resizeCanvasToFit() {
+    const container = document.getElementById('canvasOuter');
+    if (!container) return;
+
+    const availableWidth = container.clientWidth - 16;
+    const availableHeight = container.clientHeight - 16;
+    if (availableWidth <= 0 || availableHeight <= 0) return;
+
+    const scale = Math.min(availableWidth / currentVirtualWidth, availableHeight / VIRTUAL_HEIGHT);
+    canvas.setWidth(currentVirtualWidth * scale);
+    canvas.setHeight(VIRTUAL_HEIGHT * scale);
+    canvas.setZoom(scale);
+    canvas.renderAll();
+  }
+
+  window.addEventListener('resize', resizeCanvasToFit);
+  window.addEventListener('orientationchange', () => setTimeout(resizeCanvasToFit, 200));
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    drawFullIce();
+    await renderCustomBgsSelect();
+    setupCanvasEvents();
+    setupKeyEvents();
+    setupModalOverlayCloseEvents();
+    setTimeout(resizeCanvasToFit, 50);
+  });
+
+  function setupModalOverlayCloseEvents() {
+    ['historyModal', 'imagePreviewModal', 'workoutBuilderModal'].forEach(id => {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.style.display = 'none';
+          }
+        });
+      }
+    });
+  }
+
+  function createRealisticGoalObject(x, y, facingRight = true, isEquipment = false) {
+    const h = 42;
+    const red = '#dc2626';
+
+    const netBg = new fabric.Path(
+      facingRight ? `M 0 0 C -18 4, -18 ${h - 4}, 0 ${h} Z` : `M 0 0 C 18 4, 18 ${h - 4}, 0 ${h} Z`,
+      { fill: 'rgba(241, 245, 249, 0.65)', stroke: '#94a3b8', strokeWidth: 1.2, strokeDashArray: [3, 2] }
+    );
+    const netLine1 = new fabric.Line(facingRight ? [-8, 8, 0, 8] : [8, 8, 0, 8], { stroke: '#cbd5e1', strokeWidth: 1 });
+    const netLine2 = new fabric.Line(facingRight ? [-12, h / 2, 0, h / 2] : [12, h / 2, 0, h / 2], { stroke: '#cbd5e1', strokeWidth: 1 });
+    const netLine3 = new fabric.Line(facingRight ? [-8, h - 8, 0, h - 8] : [8, h - 8, 0, h - 8], { stroke: '#cbd5e1', strokeWidth: 1 });
+
+    const goalFrame = new fabric.Polyline([{ x: 0, y: 0 }, { x: 0, y: h }], { stroke: red, strokeWidth: 4, strokeLineCap: 'round' });
+    const topPost = new fabric.Line(facingRight ? [0, 0, -10, 3] : [0, 0, 10, 3], { stroke: red, strokeWidth: 2.5 });
+    const bottomPost = new fabric.Line(facingRight ? [0, h, -10, h - 3] : [0, h, 10, h - 3], { stroke: red, strokeWidth: 2.5 });
+
+    return new fabric.Group([netBg, netLine1, netLine2, netLine3, topPost, bottomPost, goalFrame], {
+      left: x, top: y, originX: 'center', originY: 'center',
+      selectable: isEquipment, evented: isEquipment, hasControls: isEquipment,
+      customType: isEquipment ? 'equipment' : 'rink_bg',
+      name: isEquipment ? 'placed_goal' : 'rink_bg'
+    });
+  }
+
+  function lockBackgroundObjects() {
+    canvas.forEachObject(obj => {
+      if (obj.name === 'rink_bg' || obj.customType === 'rink_bg') {
+        obj.set({
+          selectable: false,
+          evented: false,
+          hasControls: false,
+          lockMovementX: true,
+          lockMovementY: true
+        });
+      }
+    });
+  }
+
+  const RINK_M_TO_PX = 17.5;
+  const RINK_LEFT_OFFSET = 25;
+  const RINK_TOP_OFFSET = (580 - (26 * RINK_M_TO_PX)) / 2;
+  const RINK_LENGTH_PX = 60 * RINK_M_TO_PX;
+  const RINK_WIDTH_PX = 26 * RINK_M_TO_PX;
+  const RINK_CORNER_RADIUS_PX = 8.5 * RINK_M_TO_PX;
+
+  function createOfficialGoalCrease(x, cy, facingRight = true) {
+    const m = RINK_M_TO_PX;
+    const halfBase = 1.22 * m;
+    const straightL = 1.37 * m;
+    const bevel = 0.35 * m;
+    const arcR = 1.83 * m;
+
+    let pathD = '';
+    if (facingRight) {
+      pathD = `M ${x} ${cy - halfBase} 
+               L ${x + straightL - bevel} ${cy - halfBase} 
+               L ${x + straightL} ${cy - halfBase + bevel} 
+               A ${arcR} ${arcR} 0 0 1 ${x + straightL} ${cy + halfBase - bevel} 
+               L ${x + straightL - bevel} ${cy + halfBase} 
+               L ${x} ${cy + halfBase} Z`;
+    } else {
+      pathD = `M ${x} ${cy - halfBase} 
+               L ${x - straightL + bevel} ${cy - halfBase} 
+               L ${x - straightL} ${cy - halfBase + bevel} 
+               A ${arcR} ${arcR} 0 0 0 ${x - straightL} ${cy + halfBase - bevel} 
+               L ${x - straightL + bevel} ${cy + halfBase} 
+               L ${x} ${cy + halfBase} Z`;
+    }
+
+    const creaseArea = new fabric.Path(pathD, {
+      fill: 'rgba(56, 189, 248, 0.32)',
+      stroke: '#dc2626',
+      strokeWidth: 2,
+      selectable: false,
+      evented: false,
+      name: 'rink_bg'
+    });
+
+    return [creaseArea];
+  }
+
+  function drawFullIce() {
+    currentRinkType = 'full';
+    currentVirtualWidth = VIRTUAL_WIDTH_FULL;
+    canvas.clear();
+
+    drawFullIceWithoutReset();
+
+    if (tracingObject) canvas.add(tracingObject);
+    lockBackgroundObjects();
+    resizeCanvasToFit();
+    saveState();
+  }
+
+  function drawFaceoffCircle(cx, cy, color) {
+    const r = 4.5 * RINK_M_TO_PX;
+    const circle = new fabric.Circle({ left: cx, top: cy, originX: 'center', originY: 'center', radius: r, fill: 'transparent', stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const dot = new fabric.Circle({ left: cx, top: cy, originX: 'center', originY: 'center', radius: 0.3 * RINK_M_TO_PX, fill: color, selectable: false, evented: false, name: 'rink_bg' });
+    
+    const hashDist = 1.7 * RINK_M_TO_PX;
+    const hashLen = 0.6 * RINK_M_TO_PX;
+    const h1 = new fabric.Line([cx - hashDist, cy - r - hashLen, cx - hashDist, cy - r + hashLen], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const h2 = new fabric.Line([cx + hashDist, cy - r - hashLen, cx + hashDist, cy - r + hashLen], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const h3 = new fabric.Line([cx - hashDist, cy + r - hashLen, cx - hashDist, cy + r + hashLen], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const h4 = new fabric.Line([cx + hashDist, cy + r - hashLen, cx + hashDist, cy + r + hashLen], { stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    canvas.add(circle, dot, h1, h2, h3, h4);
+  }
+
+  function drawHalfIce() {
+    currentRinkType = 'half';
+    currentVirtualWidth = VIRTUAL_WIDTH_HALF;
+    canvas.clear();
+
+    drawHalfIceWithoutReset();
+
+    if (tracingObject) canvas.add(tracingObject);
+    lockBackgroundObjects();
+    resizeCanvasToFit();
+    saveState();
+  }
+
+  function drawNeutralZoneIce() {
+    currentRinkType = 'neutral_zone';
+    currentVirtualWidth = VIRTUAL_WIDTH_HALF;
+    canvas.clear();
+
+    drawNeutralZoneWithoutReset();
+
+    if (tracingObject) canvas.add(tracingObject);
+    lockBackgroundObjects();
+    resizeCanvasToFit();
+    saveState();
+  }
+
+  function setRinkPreset(type) {
+    document.getElementById('btnFullRink').classList.toggle('active', type === 'full');
+    document.getElementById('btnHalfRink').classList.toggle('active', type === 'half');
+    document.getElementById('btnNeutralZone').classList.toggle('active', type === 'neutral_zone');
+
+    const select = document.getElementById('customBgSelect');
+    if (select) select.value = '';
+
+    if (type === 'full') drawFullIce();
+    else if (type === 'half') drawHalfIce();
+    else if (type === 'neutral_zone') drawNeutralZoneIce();
+  }
+
+  async function renderCustomBgsSelect(selectedId = null) {
+    const select = document.getElementById('customBgSelect');
+    if (!select) return;
+    const bgs = await getCustomBgs();
+
+    select.innerHTML = '<option value="">-- Выберите свой фон --</option>';
+    bgs.forEach(bg => {
+      const opt = document.createElement('option');
+      opt.value = bg.id;
+      opt.textContent = bg.name;
+      if (selectedId && bg.id == selectedId) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  function applyCustomBgImage(dataUrl, isHalf) {
+    fabric.Image.fromURL(dataUrl, function(img) {
+      canvas.clear();
+      currentVirtualWidth = isHalf ? VIRTUAL_WIDTH_HALF : VIRTUAL_WIDTH_FULL;
+      img.scaleToWidth(currentVirtualWidth);
+      img.scaleToHeight(VIRTUAL_HEIGHT);
+      img.set({ selectable: false, evented: false, name: 'rink_bg' });
+      canvas.add(img);
+      if (tracingObject) canvas.add(tracingObject);
+      currentRinkType = isHalf ? 'half' : 'full';
+
+      document.getElementById('btnFullRink').classList.toggle('active', !isHalf);
+      document.getElementById('btnHalfRink').classList.toggle('active', isHalf);
+      document.getElementById('btnNeutralZone').classList.remove('active');
+
+      lockBackgroundObjects();
+      resizeCanvasToFit();
+      saveState();
+    });
+  }
+
+  async function applyCustomBgFromSelect(id) {
+    if (!id) return;
+    const bgs = await getCustomBgs();
+    const bg = bgs.find(b => b.id == id);
+    if (!bg) return;
+    applyCustomBgImage(bg.data, bg.isHalf);
+    closeContextPopover();
+  }
+
+  async function deleteSelectedCustomBg() {
+    const select = document.getElementById('customBgSelect');
+    if (!select || !select.value) {
+      alert('Сначала выберите фон из списка для удаления.');
+      return;
+    }
+    const id = select.value;
+    let bgs = await getCustomBgs();
+    const target = bgs.find(b => b.id == id);
+    if (!confirm(`Удалить фон «${target ? target.name : ''}» из списка?`)) return;
+
+    bgs = bgs.filter(b => b.id != id);
+    await saveCustomBgs(bgs);
+    await renderCustomBgsSelect();
+    setRinkPreset('full');
+  }
+
+  function uploadCustomBg(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(f) {
+      const dataUrl = f.target.result;
+      const img = new Image();
+      img.onload = async function() {
+        const isHalf = (img.width / img.height < 1.4);
+        const existingBgs = await getCustomBgs();
+        const defaultName = file.name.replace(/\.[^/.]+$/, '') || `Фон льда ${existingBgs.length + 1}`;
+        const bgName = prompt('Введите название для сохранения этого фона:', defaultName);
+        if (!bgName) {
+          e.target.value = '';
+          return;
+        }
+
+        const newBg = {
+          id: Date.now(),
+          name: bgName.trim(),
+          data: dataUrl,
+          isHalf: isHalf
+        };
+        existingBgs.push(newBg);
+        try {
+          await saveCustomBgs(existingBgs);
+        } catch (err) {
+          console.warn('Ошибка IndexedDB при записи фона:', err);
+        }
+
+        await renderCustomBgsSelect(newBg.id);
+        applyCustomBgImage(dataUrl, isHalf);
+        e.target.value = '';
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function openTracingUploader() {
+    if (tracingObject) {
+      toggleTracingPanel(true);
+      return;
+    }
+    document.getElementById('tracingFileInput').click();
+  }
+
+  function handleTracingUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      fabric.Image.fromURL(event.target.result, function(img) {
+        if (tracingObject) {
+          canvas.remove(tracingObject);
+        }
+
+        const maxW = currentVirtualWidth * 0.85;
+        if (img.width > maxW) {
+          img.scaleToWidth(maxW);
+        }
+
+        img.set({
+          left: currentVirtualWidth / 2,
+          top: VIRTUAL_HEIGHT / 2,
+          originX: 'center',
+          originY: 'center',
+          opacity: 0.45,
+          transparentCorners: false,
+          cornerColor: '#38bdf8',
+          cornerStrokeColor: '#ffffff',
+          borderColor: '#38bdf8',
+          cornerSize: 10,
+          name: 'tracing_layer',
+          selectable: true,
+          hasControls: true
+        });
+
+        tracingObject = img;
+        canvas.add(tracingObject);
+        canvas.setActiveObject(tracingObject);
+
+        toggleTracingPanel(true);
+        canvas.renderAll();
+        e.target.value = '';
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function toggleTracingPanel(show) {
+    const panel = document.getElementById('tracingFloatingBar');
+    if (show) {
+      panel.classList.add('active');
+    } else {
+      panel.classList.remove('active');
+    }
+  }
+
+  function updateTracingOpacity(val) {
+    if (!tracingObject) return;
+    tracingObject.set('opacity', parseFloat(val));
+    document.getElementById('tracingOpacityValue').textContent = `${Math.round(val * 100)}%`;
+    canvas.renderAll();
+  }
+
+  function toggleTracingLock() {
+    if (!tracingObject) return;
+    isTracingLocked = !isTracingLocked;
+    const btn = document.getElementById('btnLockTracing');
+
+    tracingObject.set({
+      selectable: !isTracingLocked,
+      evented: !isTracingLocked
+    });
+
+    if (isTracingLocked) {
+      canvas.discardActiveObject();
+      btn.innerHTML = '<i class="ph ph-lock-key-open"></i> Открепить';
+      btn.style.background = '#0284c7';
+    } else {
+      canvas.setActiveObject(tracingObject);
+      btn.innerHTML = '<i class="ph ph-lock-key"></i> Закрепить';
+      btn.style.background = '#1e293b';
+    }
+    canvas.renderAll();
+  }
+
+  function removeTracing() {
+    if (!tracingObject) return;
+    canvas.remove(tracingObject);
+    tracingObject = null;
+    isTracingLocked = false;
+    toggleTracingPanel(false);
+    document.getElementById('btnLockTracing').innerHTML = '<i class="ph ph-lock-key"></i> Закрепить';
+    canvas.renderAll();
+  }
+
+  function getNextPlayerNumber(role) {
+    let count = 0;
+    canvas.forEachObject(obj => {
+      if (obj.customType === 'player' && obj.playerRole === role) count++;
+    });
+    return count + 1;
+  }
+
+  function renumberPlayers(role) {
+    let counter = 1;
+    canvas.forEachObject(obj => {
+      if (obj.customType === 'player' && obj.playerRole === role) {
+        if (obj.isStampMode) {
+          obj.playerNumber = counter;
+          const textObj = obj.item(1);
+          if (textObj) textObj.set('text', `${role}${counter}`);
+          counter++;
+        }
+      }
+    });
+    canvas.requestRenderAll();
+  }
+
+  function preparePlacement(type, options = {}, btnElement = null) {
+    placementItem = { type, options };
+    setTool('placement');
+
+    document.querySelectorAll('.place-btn').forEach(b => b.classList.remove('active'));
+    if (btnElement) btnElement.classList.add('active');
+
+    const hint = document.getElementById('hintBar');
+    if (type === 'player') hint.textContent = `Кликайте по полю для добавления ${options.role}. Нажмите Выбор для завершения.`;
+    else if (type === 'coach') hint.textContent = 'Кликайте по полю для добавления Тренера (C).';
+    else if (type === 'cross') hint.textContent = 'Кликайте по полю для расстановки крестиков (✕).';
+    else if (type === 'ring') hint.textContent = 'Кликайте по полю для расстановки полых кружков (○).';
+    else if (type === 'puck') hint.textContent = 'Кликайте по полю для добавления шайб.';
+    else if (type === 'cone') hint.textContent = 'Кликайте по полю для расстановки конусов.';
+    else if (type === 'goal') hint.textContent = 'Кликните для установки ворот на поле.';
+    else if (type === 'text') hint.textContent = 'Кликните на поле для добавления текста инструкции.';
+  }
+
+  function executePlacement(pointer) {
+    if (!placementItem) return;
+    const { type, options } = placementItem;
+
+    if (type === 'player') {
+      const isStamp = (playerStampMode === 'stamp');
+      const num = isStamp ? getNextPlayerNumber(options.role) : '';
+      const displayText = isStamp ? `${options.role}${num}` : options.role;
+
+      const fillColor = (options.role === 'G') ? '#16a34a' : currentColor;
+
+      const circle = new fabric.Circle({
+        radius: 14, fill: fillColor, stroke: '#ffffff', strokeWidth: 2, originX: 'center', originY: 'center'
+      });
+      const txt = new fabric.Text(displayText, {
+        fontSize: isStamp ? 12 : 14, fill: '#ffffff', fontWeight: 'bold', originX: 'center', originY: 'center', fontFamily: 'sans-serif'
+      });
+      const player = new fabric.Group([circle, txt], {
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        scaleX: globalObjectScale, scaleY: globalObjectScale,
+        selectable: true, hasControls: true, customType: 'player',
+        playerRole: options.role, playerNumber: num,
+        isStampMode: isStamp
+      });
+      canvas.add(player);
+
+    } else if (type === 'coach') {
+      const isStamp = (playerStampMode === 'stamp');
+      const num = isStamp ? getNextPlayerNumber('C') : '';
+      const displayText = isStamp ? (num > 1 ? `C${num}` : 'C') : 'C';
+
+      const circle = new fabric.Circle({
+        radius: 14, fill: '#0f172a', stroke: '#ffffff', strokeWidth: 2, originX: 'center', originY: 'center'
+      });
+      const txt = new fabric.Text(displayText, {
+        fontSize: 13, fill: '#ffffff', fontWeight: 'bold', originX: 'center', originY: 'center', fontFamily: 'sans-serif'
+      });
+      const coach = new fabric.Group([circle, txt], {
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        scaleX: globalObjectScale, scaleY: globalObjectScale,
+        selectable: true, hasControls: true, customType: 'player',
+        playerRole: 'C', playerNumber: num,
+        isStampMode: isStamp
+      });
+      canvas.add(coach);
+
+    } else if (type === 'cross') {
+      const size = 11;
+      const line1 = new fabric.Line([-size, -size, size, size], {
+        stroke: currentColor, strokeWidth: 3.2, strokeLineCap: 'round'
+      });
+      const line2 = new fabric.Line([-size, size, size, -size], {
+        stroke: currentColor, strokeWidth: 3.2, strokeLineCap: 'round'
+      });
+      const cross = new fabric.Group([line1, line2], {
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        scaleX: globalObjectScale, scaleY: globalObjectScale,
+        selectable: true, hasControls: true, customType: 'equipment'
+      });
+      canvas.add(cross);
+
+    } else if (type === 'ring') {
+      const ring = new fabric.Circle({
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        radius: 11, fill: 'transparent', stroke: currentColor, strokeWidth: 3,
+        scaleX: globalObjectScale, scaleY: globalObjectScale,
+        selectable: true, hasControls: true, customType: 'equipment'
+      });
+      canvas.add(ring);
+
+    } else if (type === 'puck') {
+      const puck = new fabric.Circle({
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        radius: 7, fill: '#000000', stroke: '#ffffff', strokeWidth: 1.5,
+        scaleX: globalObjectScale, scaleY: globalObjectScale,
+        selectable: true, customType: 'equipment'
+      });
+      canvas.add(puck);
+
+    } else if (type === 'cone') {
+      const cone = new fabric.Triangle({
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        width: 18, height: 20, fill: '#ea580c', stroke: '#ffffff', strokeWidth: 1.5,
+        scaleX: globalObjectScale, scaleY: globalObjectScale,
+        selectable: true, customType: 'equipment'
+      });
+      canvas.add(cone);
+
+    } else if (type === 'goal') {
+      const goal = createRealisticGoalObject(pointer.x, pointer.y, true, true);
+      goal.set({
+        selectable: true,
+        evented: true,
+        hasControls: true,
+        lockMovementX: false,
+        lockMovementY: false,
+        scaleX: globalObjectScale,
+        scaleY: globalObjectScale
+      });
+      canvas.add(goal);
+
+    } else if (type === 'text') {
+      const text = new fabric.IText('Задание на тренировку', {
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        fontSize: Math.round(15 * globalObjectScale), fill: currentColor, backgroundColor: 'rgba(255,255,255,0.9)',
+        padding: 5, customType: 'annotation'
+      });
+      canvas.add(text);
+      canvas.setActiveObject(text);
+      setTool('select');
+      saveState();
+      return;
+    }
+    saveState();
+  }
+
+  function getPolylineMetrics(points) {
+    let totalLen = 0;
+    const segLens = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const d = Math.hypot(points[i+1].x - points[i].x, points[i+1].y - points[i].y);
+      segLens.push(d);
+      totalLen += d;
+    }
+    return { totalLen, segLens };
+  }
+
+  function getPointAlongPath(points, segLens, totalLen, dist) {
+    if (dist <= 0) {
+      const p1 = points[0], p2 = points[1] || points[0];
+      const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
+      return { pt: points[0], tangent: { nx: -dy / len, ny: dx / len, dx: dx / len, dy: dy / len } };
+    }
+    if (dist >= totalLen) {
+      const p1 = points[points.length - 2] || points[0], p2 = points[points.length - 1];
+      const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
+      return { pt: p2, tangent: { nx: -dy / len, ny: dx / len, dx: dx / len, dy: dy / len } };
+    }
+    let accum = 0;
+    for (let i = 0; i < segLens.length; i++) {
+      if (accum + segLens[i] >= dist) {
+        const segDist = dist - accum;
+        const ratio = segLens[i] === 0 ? 0 : segDist / segLens[i];
+        const p1 = points[i], p2 = points[i + 1];
+        const bx = p1.x + (p2.x - p1.x) * ratio;
+        const by = p1.y + (p2.y - p1.y) * ratio;
+        const dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
+        return { pt: { x: bx, y: by }, tangent: { nx: -dy / len, ny: dx / len, dx: dx / len, dy: dy / len } };
+      }
+      accum += segLens[i];
+    }
+    return { pt: points[points.length - 1], tangent: { nx: 0, ny: 0, dx: 1, dy: 0 } };
+  }
+
+  // Расчёт точек гладкой дуги (Bezier spline interpolation)
+  function getSampledCurvePoints(rawPts) {
+    if (!rawPts || rawPts.length < 2) return rawPts || [];
+    if (rawPts.length === 2) return rawPts;
+
+    // Для 3 контрольных точек (начало, вершина изгиба, конец) строим квадратичную кривую Безье
+    if (rawPts.length === 3) {
+      const p0 = rawPts[0];
+      const p1 = rawPts[1];
+      const p2 = rawPts[2];
+      const steps = 60;
+      const sampled = [];
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
+        const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+        sampled.push({ x, y });
+      }
+      return sampled;
+    }
+
+    // Для произвольного числа точек используем сглаженный Catmull-Rom / сглаживающий сплайн
+    const stepsPerSeg = 24;
+    const sampled = [];
+
+    for (let i = 0; i < rawPts.length - 1; i++) {
+      const p0 = rawPts[Math.max(0, i - 1)];
+      const p1 = rawPts[i];
+      const p2 = rawPts[i + 1];
+      const p3 = rawPts[Math.min(rawPts.length - 1, i + 2)];
+
+      for (let s = 0; s < stepsPerSeg; s++) {
+        const t = s / stepsPerSeg;
+        const t2 = t * t;
+        const t3 = t2 * t;
+
+        const x = 0.5 * ((2 * p1.x) +
+          (-p0.x + p2.x) * t +
+          (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+          (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+
+        const y = 0.5 * ((2 * p1.y) +
+          (-p0.y + p2.y) * t +
+          (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+          (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+
+        sampled.push({ x, y });
+      }
+    }
+    sampled.push(rawPts[rawPts.length - 1]);
+    return sampled;
+  }
+
+  function generateHockeyTacticalSVG(controlPoints, pattern) {
+    if (controlPoints.length < 2) return { svg: '', dots: [] };
+
+    // Точки вдоль гладкой дуги
+    const points = (controlPoints.length > 2) ? getSampledCurvePoints(controlPoints) : controlPoints;
+    const { totalLen, segLens } = getPolylineMetrics(points);
+    if (totalLen < 5) return { svg: `M ${points[0].x} ${points[0].y} L ${points[points.length-1].x} ${points[points.length-1].y}`, dots: [] };
+
+    if (pattern === 'forward') {
+      let svg = '';
+      for (let i = 0; i < points.length; i++) {
+        svg += (i === 0) ? `M ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} ` : `L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} `;
+      }
+      return { svg, dots: [] };
+    }
+
+    if (pattern === 'forward_puck') {
+      const wavelength = 18 * globalObjectScale;
+      const amplitude = 5.5 * globalObjectScale;
+      const steps = Math.max(16, Math.floor(totalLen / 2));
+      let svg = '';
+      for (let s = 0; s <= steps; s++) {
+        const d = (s / steps) * totalLen;
+        const { pt, tangent } = getPointAlongPath(points, segLens, totalLen, d);
+        const wave = Math.sin((d / wavelength) * Math.PI * 2) * amplitude;
+        const fx = pt.x + tangent.nx * wave;
+        const fy = pt.y + tangent.ny * wave;
+        svg += (s === 0) ? `M ${fx.toFixed(1)} ${fy.toFixed(1)} ` : `L ${fx.toFixed(1)} ${fy.toFixed(1)} `;
+      }
+      return { svg, dots: [] };
+    }
+
+    if (pattern === 'backward' || pattern === 'backward_puck') {
+      const arcLen = 11 * globalObjectScale;
+      const gap = 2.5 * globalObjectScale;
+      const step = arcLen + gap;
+      const count = Math.max(1, Math.floor(totalLen / step));
+      const offsetFromCenter = 3.5 * globalObjectScale;
+      const arcHeight = 5.5 * globalObjectScale;
+
+      let svg = '';
+      const puckDots = [];
+
+      for (let i = 0; i < count; i++) {
+        const dStart = i * step;
+        const dEnd = dStart + arcLen;
+        if (dEnd > totalLen) break;
+
+        const side = (i % 2 === 0) ? 1 : -1;
+        const p1 = getPointAlongPath(points, segLens, totalLen, dStart);
+        const p2 = getPointAlongPath(points, segLens, totalLen, dEnd);
+        const dMid = (dStart + dEnd) / 2;
+        const pMid = getPointAlongPath(points, segLens, totalLen, dMid);
+
+        const sx = p1.pt.x + p1.tangent.nx * (offsetFromCenter * side);
+        const sy = p1.pt.y + p1.tangent.ny * (offsetFromCenter * side);
+        const ex = p2.pt.x + p2.tangent.nx * (offsetFromCenter * side);
+        const ey = p2.pt.y + p2.tangent.ny * (offsetFromCenter * side);
+        const mx = pMid.pt.x + pMid.tangent.nx * ((offsetFromCenter + arcHeight) * side);
+        const my = pMid.pt.y + pMid.tangent.ny * ((offsetFromCenter + arcHeight) * side);
+
+        svg += `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)} `;
+
+        if (pattern === 'backward_puck') {
+          const dPuck = dEnd + gap / 2;
+          if (dPuck < totalLen) {
+            const puckPos = getPointAlongPath(points, segLens, totalLen, dPuck);
+            puckDots.push({ x: puckPos.pt.x, y: puckPos.pt.y });
+          }
+        }
+      }
+      return { svg, dots: puckDots };
+    }
+
+    if (pattern === 'lateral') {
+      let svg = '';
+      for (let i = 0; i < points.length; i++) {
+        svg += (i === 0) ? `M ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} ` : `L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} `;
+      }
+      const stepDist = 9 * globalObjectScale;
+      const barLen = 5.5 * globalObjectScale;
+      for (let d = 4; d < totalLen - 4; d += stepDist) {
+        const { pt, tangent } = getPointAlongPath(points, segLens, totalLen, d);
+        const x1 = pt.x - tangent.nx * barLen;
+        const y1 = pt.y - tangent.ny * barLen;
+        const x2 = pt.x + tangent.nx * barLen;
+        const y2 = pt.y + tangent.ny * barLen;
+        svg += ` M ${x1.toFixed(1)} ${y1.toFixed(1)} L ${x2.toFixed(1)} ${y2.toFixed(1)} `;
+      }
+      return { svg, dots: [] };
+    }
+
+    if (pattern === 'butterfly') {
+      const loopLen = 14 * globalObjectScale;
+      const count = Math.max(2, Math.floor(totalLen / loopLen));
+      let svg = '';
+      for (let i = 0; i < count; i++) {
+        const d1 = (i / count) * totalLen;
+        const d2 = ((i + 1) / count) * totalLen;
+        const p1 = getPointAlongPath(points, segLens, totalLen, d1);
+        const p2 = getPointAlongPath(points, segLens, totalLen, d2);
+        const midD = (d1 + d2) / 2;
+        const pMid = getPointAlongPath(points, segLens, totalLen, midD);
+        const span = 4.5 * globalObjectScale;
+        svg += `M ${p1.pt.x.toFixed(1)} ${p1.pt.y.toFixed(1)} Q ${(pMid.pt.x + pMid.tangent.nx * span).toFixed(1)} ${(pMid.pt.y + pMid.tangent.ny * span).toFixed(1)} ${p2.pt.x.toFixed(1)} ${p2.pt.y.toFixed(1)} `;
+        svg += `M ${p1.pt.x.toFixed(1)} ${p1.pt.y.toFixed(1)} Q ${(pMid.pt.x - pMid.tangent.nx * span).toFixed(1)} ${(pMid.pt.y - pMid.tangent.ny * span).toFixed(1)} ${p2.pt.x.toFixed(1)} ${p2.pt.y.toFixed(1)} `;
+      }
+      return { svg, dots: [] };
+    }
+
+    if (pattern === 'shooting') {
+      const gap = 3 * globalObjectScale;
+      const steps = Math.max(14, Math.floor(totalLen / 3));
+      let line1 = '', line2 = '';
+      for (let s = 0; s <= steps; s++) {
+        const d = (s / steps) * totalLen;
+        const { pt, tangent } = getPointAlongPath(points, segLens, totalLen, d);
+        const x1 = pt.x + tangent.nx * gap;
+        const y1 = pt.y + tangent.ny * gap;
+        const x2 = pt.x - tangent.nx * gap;
+        const y2 = pt.y - tangent.ny * gap;
+        line1 += (s === 0) ? `M ${x1.toFixed(1)} ${y1.toFixed(1)} ` : `L ${x1.toFixed(1)} ${y1.toFixed(1)} `;
+        line2 += (s === 0) ? `M ${x2.toFixed(1)} ${y2.toFixed(1)} ` : `L ${x2.toFixed(1)} ${y2.toFixed(1)} `;
+      }
+      return { svg: line1 + line2, dots: [] };
+    }
+
+    if (pattern === 'passing' || pattern === 'pucks_line') {
+      let svg = '';
+      for (let i = 0; i < points.length; i++) {
+        svg += (i === 0) ? `M ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} ` : `L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)} `;
+      }
+      return { svg, dots: [] };
+    }
+
+    return { svg: generateSmoothSVGPath(controlPoints), dots: [] };
+  }
+
+  function createTacticalEnding(x, y, angle) {
+    if (currentEnding === 'none') return null;
+
+    if (currentEnding === 'arrow') {
+      const sz = 10 * globalObjectScale;
+      const arrowPath = `M ${-sz} ${-sz * 0.9} L ${sz * 0.2} 0 L ${-sz} ${sz * 0.9}`;
+      return new fabric.Path(arrowPath, {
+        left: x, top: y, originX: 'center', originY: 'center',
+        fill: 'transparent', stroke: currentColor,
+        strokeWidth: strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round',
+        angle: angle
+      });
+    }
+
+    if (currentEnding === 'stop') {
+      const barHeight = 18 * globalObjectScale;
+      const barGap = 4 * globalObjectScale;
+      const bar1 = new fabric.Line([-barGap, -barHeight / 2, -barGap, barHeight / 2], {
+        stroke: currentColor, strokeWidth: strokeWidth, strokeLineCap: 'round'
+      });
+      const bar2 = new fabric.Line([barGap, -barHeight / 2, barGap, barHeight / 2], {
+        stroke: currentColor, strokeWidth: strokeWidth, strokeLineCap: 'round'
+      });
+      return new fabric.Group([bar1, bar2], {
+        left: x, top: y, originX: 'center', originY: 'center', angle: angle
+      });
+    }
+
+    if (currentEnding === 'dot') {
+      return new fabric.Circle({
+        left: x, top: y, originX: 'center', originY: 'center',
+        radius: 6 * globalObjectScale, fill: currentColor
+      });
+    }
+
+    const basePivotPath = "M 0 0 C 14 0, 20 18, 10 24 C 0 30, -8 22, -8 14 M -13 18 L -8 13 L -3 18";
+
+    if (currentEnding === 'right_pivot') {
+      const pathObj = new fabric.Path(basePivotPath, {
+        fill: 'transparent', stroke: currentColor,
+        strokeWidth: strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round',
+        scaleX: globalObjectScale, scaleY: globalObjectScale
+      });
+      return new fabric.Group([pathObj], {
+        left: x, top: y, originX: 'left', originY: 'top',
+        angle: angle
+      });
+    }
+
+    if (currentEnding === 'left_pivot') {
+      const pathObj = new fabric.Path(basePivotPath, {
+        fill: 'transparent', stroke: currentColor,
+        strokeWidth: strokeWidth, strokeLineCap: 'round', strokeLineJoin: 'round',
+        scaleX: globalObjectScale, scaleY: -globalObjectScale
+      });
+      return new fabric.Group([pathObj], {
+        left: x, top: y, originX: 'left', originY: 'bottom',
+        angle: angle
+      });
+    }
+
+    return null;
+  }
+
+  function getStrokeDashForPattern(pat) {
+    if (pat === 'passing') return [8 * globalObjectScale, 6 * globalObjectScale];
+    if (pat === 'pucks_line') return [3 * globalObjectScale, 8 * globalObjectScale];
+    return null;
+  }
+
+  function setupCanvasEvents() {
+    canvas.on('selection:created', (e) => {
+      const selected = e.selected || [];
+      if (selected.length === 1 && selected[0].controlPoints) {
+        renderLineHandles(selected[0]);
+      } else if (!selected.some(o => o.isControlHandle)) {
+        clearLineHandles();
+      }
+    });
+
+    canvas.on('selection:updated', (e) => {
+      const selected = e.selected || [];
+      if (selected.length === 1 && selected[0].controlPoints) {
+        renderLineHandles(selected[0]);
+      } else if (!selected.some(o => o.isControlHandle)) {
+        clearLineHandles();
+      }
+    });
+
+    canvas.on('selection:cleared', (e) => {
+      setTimeout(() => {
+        const active = canvas.getActiveObject();
+        if (!active || !active.isControlHandle) {
+          clearLineHandles();
+        }
+      }, 10);
+    });
+
+    canvas.on('object:moving', (e) => {
+      const target = e.target;
+      if (!target) return;
+
+      if (target.controlPoints && target === activeControlLine) {
+        const dx = target.left - target.lastLeft;
+        const dy = target.top - target.lastTop;
+        target.lastLeft = target.left;
+        target.lastTop = target.top;
+
+        target.controlPoints.forEach(pt => {
+          pt.x += dx;
+          pt.y += dy;
+        });
+
+        activeControlHandles.forEach(h => {
+          h.left += dx;
+          h.top += dy;
+          h.setCoords();
+        });
+        canvas.requestRenderAll();
+        return;
+      }
+
+      if (target.isControlHandle && activeControlLine) {
+        const pointer = { x: target.left, y: target.top };
+
+        if (target.isMidpoint) {
+          if (!draggingMidData || draggingMidData.handle !== target) {
+            const insertIdx = target.segIndex + 1;
+            const origX = target.origMidX || target.left;
+            const origY = target.origMidY || target.top;
+
+            const fixedDot = new fabric.Circle({
+              left: origX,
+              top: origY,
+              radius: 5 * globalObjectScale,
+              fill: '#ea580c',
+              stroke: '#ffffff',
+              strokeWidth: 1.5,
+              originX: 'center',
+              originY: 'center',
+              selectable: false,
+              evented: false,
+              isControlHandle: true
+            });
+
+            const guideLine = new fabric.Line([origX, origY, pointer.x, pointer.y], {
+              stroke: '#94a3b8',
+              strokeWidth: 1.5,
+              strokeDashArray: [4, 3],
+              opacity: 0.65,
+              selectable: false,
+              evented: false,
+              isControlHandle: true
+            });
+
+            canvas.add(fixedDot);
+            canvas.add(guideLine);
+            fixedDot.bringToFront();
+            canvas.bringToFront(guideLine);
+
+            activeControlLine.controlPoints.splice(insertIdx, 0, pointer);
+
+            draggingMidData = {
+              handle: target,
+              insertIdx: insertIdx,
+              fixedDot: fixedDot,
+              guideLine: guideLine,
+              origX: origX,
+              origY: origY
+            };
+          } else {
+            activeControlLine.controlPoints[draggingMidData.insertIdx] = pointer;
+            draggingMidData.guideLine.set({
+              x2: pointer.x,
+              y2: pointer.y
+            });
+            draggingMidData.guideLine.setCoords();
+          }
+
+          updateTacticalGroupFromPoints(activeControlLine);
+        } else {
+          activeControlLine.controlPoints[target.pointIndex] = pointer;
+          updateTacticalGroupFromPoints(activeControlLine);
+
+          activeControlHandles.forEach(h => {
+            if (h.isMidpoint) {
+              const pts = activeControlLine.controlPoints;
+              if (pts[h.segIndex] && pts[h.segIndex + 1]) {
+                const mx = (pts[h.segIndex].x + pts[h.segIndex + 1].x) / 2;
+                const my = (pts[h.segIndex].y + pts[h.segIndex + 1].y) / 2;
+                h.set({ left: mx, top: my });
+                h.origMidX = mx;
+                h.origMidY = my;
+                h.setCoords();
+              }
+            }
+          });
+        }
+        canvas.requestRenderAll();
+      }
+    });
+
+    canvas.on('mouse:down:before', (opt) => {
+      if (opt.target && opt.target.controlPoints) {
+        opt.target.lastLeft = opt.target.left;
+        opt.target.lastTop = opt.target.top;
+      }
+      if (opt.target && opt.target.isMidpoint) {
+        opt.target.origMidX = opt.target.left;
+        opt.target.origMidY = opt.target.top;
+      }
+    });
+
+    canvas.on('object:modified', (e) => {
+      if (e.target && (e.target.isControlHandle || e.target.controlPoints)) {
+        if (draggingMidData) {
+          if (draggingMidData.fixedDot) canvas.remove(draggingMidData.fixedDot);
+          if (draggingMidData.guideLine) canvas.remove(draggingMidData.guideLine);
+          draggingMidData = null;
+          renderLineHandles(activeControlLine);
+        }
+        saveState();
+      }
+    });
+
+    canvas.on('mouse:dblclick', (opt) => {
+      const target = opt.target;
+      if (target && target.customType === 'player') {
+        const textObj = target.item(1);
+        const currentTxt = textObj ? textObj.text : '';
+        const newTxt = prompt('Введите подпись фишки (например: F, FL, RD, LW):', currentTxt);
+        if (newTxt !== null && newTxt.trim() !== '') {
+          target.isStampMode = false;
+          textObj.set({
+            text: newTxt.trim(),
+            fontSize: newTxt.trim().length > 2 ? 10 : 13
+          });
+          target.addWithUpdate();
+          canvas.requestRenderAll();
+          saveState();
+        }
+      }
+    });
+
+    canvas.on('mouse:down', (opt) => {
+      const p = canvas.getPointer(opt.e);
+
+      if (opt.target && opt.target.isControlHandle) {
+        return;
+      }
+
+      const isOverSelectableObject = opt.target && opt.target.name !== 'rink_bg' && opt.target !== tracingObject && !opt.target.isControlHandle;
+
+      if (currentTool === 'placement') {
+        if (isOverSelectableObject) {
+          canvas.setActiveObject(opt.target);
+          canvas.requestRenderAll();
+          return;
+        }
+        clearLineHandles();
+        executePlacement(p);
+        return;
+      }
+
+      if (currentTool === 'eraser') {
+        if (opt.target && opt.target.name !== 'rink_bg' && opt.target !== tracingObject && !opt.target.isControlHandle) {
+          const removedRole = opt.target.playerRole;
+          canvas.remove(opt.target);
+          if (removedRole) renumberPlayers(removedRole);
+          saveState();
+        }
+        return;
+      }
+
+      if ((currentTool === 'brush' || currentTool === 'straightArrow') && isOverSelectableObject) {
+        canvas.setActiveObject(opt.target);
+        canvas.requestRenderAll();
+        return;
+      }
+
+      isMouseDown = true;
+
+      if (currentTool === 'brush') {
+        rawPoints = [{ x: p.x, y: p.y }];
+        livePreviewLine = new fabric.Polyline([...rawPoints], {
+          stroke: currentColor,
+          strokeWidth: (currentPattern === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
+          strokeDashArray: getStrokeDashForPattern(currentPattern),
+          fill: 'transparent',
+          strokeLineCap: 'round',
+          strokeLineJoin: 'round',
+          selectable: false,
+          evented: false,
+          objectCaching: false
+        });
+        canvas.add(livePreviewLine);
+      } else if (currentTool === 'straightArrow') {
+        straightLine = new fabric.Line([p.x, p.y, p.x, p.y], {
+          stroke: currentColor,
+          strokeWidth: (currentPattern === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
+          strokeDashArray: getStrokeDashForPattern(currentPattern),
+          selectable: false,
+          evented: false,
+          objectCaching: false
+        });
+        canvas.add(straightLine);
+      }
+    });
+
+    canvas.on('mouse:move', (opt) => {
+      if (!isMouseDown) return;
+      const p = canvas.getPointer(opt.e);
+
+      if (currentTool === 'brush' && livePreviewLine) {
+        rawPoints.push({ x: p.x, y: p.y });
+        livePreviewLine.points = [...rawPoints];
+        livePreviewLine._setPositionDimensions({});
+        canvas.requestRenderAll();
+      } else if (currentTool === 'straightArrow' && straightLine) {
+        straightLine.set({ x2: p.x, y2: p.y });
+        canvas.requestRenderAll();
+      }
+    });
+
+    canvas.on('mouse:up', () => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+
+      if (currentTool === 'brush' && livePreviewLine) {
+        canvas.remove(livePreviewLine);
+        livePreviewLine = null;
+
+        if (rawPoints.length > 2) {
+          const { svg, dots } = generateHockeyTacticalSVG(rawPoints, currentPattern);
+          const finalPath = new fabric.Path(svg, {
+            stroke: currentColor,
+            strokeWidth: (currentPattern === 'pucks_line') ? Math.round(5 * globalObjectScale) : strokeWidth,
+            strokeDashArray: getStrokeDashForPattern(currentPattern),
+            fill: 'transparent',
+            strokeLineCap: 'round',
+            strokeLineJoin: 'round'
+          });
+
+          const items = [finalPath];
+          dots.forEach(d => {
+            items.push(new fabric.Circle({
+              left: d.x, top: d.y, radius: 2.6 * globalObjectScale, fill: currentColor, originX: 'center', originY: 'center'
+            }));
+          });
+
+          const lastPt = rawPoints[rawPoints.length - 1];
+          const sampleBack = Math.max(0, rawPoints.length - 5);
+          const prevPt = rawPoints[sampleBack];
+          const angle = Math.atan2(lastPt.y - prevPt.y, lastPt.x - prevPt.x) * (180 / Math.PI);
+          const marker = createTacticalEnding(lastPt.x, lastPt.y, angle);
+
+          if (marker) items.push(marker);
+
+          const group = new fabric.Group(items, {
+            selectable: (currentTool === 'select'),
+            hasControls: false,
+            hasBorders: false,
+            customType: 'tactical_trajectory'
+          });
+          canvas.add(group);
+          saveState();
+        }
+      } else if (currentTool === 'straightArrow' && straightLine) {
+        const x1 = straightLine.x1, y1 = straightLine.y1, x2 = straightLine.x2, y2 = straightLine.y2;
+        canvas.remove(straightLine);
+        straightLine = null;
+
+        if (Math.hypot(x2 - x1, y2 - y1) > 8) {
+          const pts = [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+          const group = buildTrajectoryGroup(pts, currentPattern, currentColor, currentEnding);
+          canvas.add(group);
+          renderLineHandles(group);
+          saveState();
+        }
+      }
+    });
+  }
+
+  function deleteActiveObject() {
+    const activeObjects = canvas.getActiveObjects ? canvas.getActiveObjects() : [canvas.getActiveObject()];
+    if (!activeObjects || activeObjects.length === 0) return;
+
+    let rolesToRenumber = new Set();
+
+    activeObjects.forEach(obj => {
+      if (obj && !obj.isEditing && obj.name !== 'rink_bg' && !obj.isControlHandle) {
+        if (obj === tracingObject) {
+          removeTracing();
+        } else {
+          if (obj.playerRole && obj.isStampMode) {
+            rolesToRenumber.add(obj.playerRole);
+          }
+          canvas.remove(obj);
+        }
+      }
+    });
+
+    clearLineHandles();
+    canvas.discardActiveObject();
+
+    rolesToRenumber.forEach(role => renumberPlayers(role));
+    canvas.requestRenderAll();
+    saveState();
+  }
+
+  function setupKeyEvents() {
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        setTool('select');
+        closeContextPopover();
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeObj = canvas.getActiveObject();
+        if (activeObj && activeObj.isEditing) return;
+        deleteActiveObject();
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    });
+  }
+
+  function setTool(tool) {
+    clearLineHandles();
+    currentTool = tool;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    if (tool !== 'placement') {
+      document.querySelectorAll('.place-btn').forEach(b => b.classList.remove('active'));
+      placementItem = null;
+    }
+
+    const idMap = { select: 'toolSelect', brush: 'toolBrush', straightArrow: 'toolStraightArrow', eraser: 'toolEraser' };
+    if (idMap[tool]) document.getElementById(idMap[tool]).classList.add('active');
+
+    const hint = document.getElementById('hintBar');
+    if (tool === 'select') hint.textContent = 'Режим выбора: перемещение, вращение и выделение рамкой';
+    else if (tool === 'brush') hint.textContent = 'Кисть: рисуйте тактическую траекторию на льду';
+    else if (tool === 'straightArrow') hint.textContent = 'Прямая: протяните линию от точки к точке';
+    else if (tool === 'eraser') hint.textContent = 'Ластик: кликните на объект для удаления';
+
+    canvas.selection = (tool === 'select');
+    canvas.discardActiveObject();
+    canvas.forEachObject(obj => {
+      if (obj.name !== 'rink_bg' && obj !== tracingObject && !obj.isControlHandle) {
+        obj.selectable = (tool === 'select');
+        obj.evented = true;
+        if (obj.customType === 'tactical_trajectory') {
+          obj.hasControls = false;
+          obj.hasBorders = false;
+        }
+      }
+    });
+
+    if (tracingObject && !isTracingLocked) {
+      tracingObject.selectable = (tool === 'select');
+      tracingObject.evented = (tool === 'select');
+    }
+
+    canvas.defaultCursor = (tool === 'select') ? 'default' : 'crosshair';
+    lockBackgroundObjects();
+    canvas.requestRenderAll();
+  }
+
+  function setPattern(p) {
+    currentPattern = p;
+    document.querySelectorAll('.pattern-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('pat_' + p);
+    if (btn) btn.classList.add('active');
+  }
+
+  function setEnding(e) {
+    currentEnding = e;
+    document.querySelectorAll('.ending-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('end_' + e);
+    if (btn) btn.classList.add('active');
+  }
+
+  function setColor(c, elem) {
+    currentColor = c;
+    document.querySelectorAll('.color-swatch').forEach(e => e.classList.remove('active'));
+    elem.classList.add('active');
+  }
+
+  function updateHistoryButtonsUI() {
+    const btnUndo = document.getElementById('btnUndo');
+    const btnRedo = document.getElementById('btnRedo');
+    if (btnUndo) btnUndo.disabled = (undoHistory.length <= 1);
+    if (btnRedo) btnRedo.disabled = (redoHistory.length === 0);
+  }
+
+  function getCleanCanvasJSON() {
+    const objects = canvas.getObjects().filter(obj => !obj.isControlHandle);
+    const canvasData = {
+      objects: objects.map(obj => obj.toObject([
+        'name', 'customType', 'playerRole', 'playerNumber', 
+        'isStampMode', 'controlPoints', 'linePattern', 'lineColor', 'lineEnding'
+      ])),
+      background: canvas.backgroundColor
+    };
+    return JSON.stringify(canvasData);
+  }
+
+  function saveState() {
+    if (isStateChanging) return;
+    const jsonState = getCleanCanvasJSON();
+
+    if (undoHistory.length > 0 && undoHistory[undoHistory.length - 1] === jsonState) {
+      return;
+    }
+
+    undoHistory.push(jsonState);
+    if (undoHistory.length > 30) undoHistory.shift();
+
+    redoHistory = [];
+    updateHistoryButtonsUI();
+  }
+
+  function undo() {
+    if (undoHistory.length > 1) {
+      isStateChanging = true;
+      clearLineHandles();
+      const currentState = undoHistory.pop();
+      redoHistory.push(currentState);
+
+      const prevState = undoHistory[undoHistory.length - 1];
+      canvas.loadFromJSON(prevState, () => {
+        canvas.forEachObject(obj => {
+          if (obj.customType === 'tactical_trajectory') {
+            obj.hasControls = false;
+            obj.hasBorders = false;
+          }
+        });
+        lockBackgroundObjects();
+        resizeCanvasToFit();
+        canvas.renderAll();
+        isStateChanging = false;
+        updateHistoryButtonsUI();
+      });
+    }
+  }
+
+  function redo() {
+    if (redoHistory.length > 0) {
+      isStateChanging = true;
+      clearLineHandles();
+      const nextState = redoHistory.pop();
+      undoHistory.push(nextState);
+
+      canvas.loadFromJSON(nextState, () => {
+        canvas.forEachObject(obj => {
+          if (obj.customType === 'tactical_trajectory') {
+            obj.hasControls = false;
+            obj.hasBorders = false;
+          }
+        });
+        lockBackgroundObjects();
+        resizeCanvasToFit();
+        canvas.renderAll();
+        isStateChanging = false;
+        updateHistoryButtonsUI();
+      });
+    }
+  }
+
+  function clearCanvas() {
+    if (confirm('Очистить планшет? Все расставленные элементы пропадут.')) {
+      clearLineHandles();
+      if (currentRinkType === 'half') drawHalfIce();
+      else if (currentRinkType === 'neutral_zone') drawNeutralZoneIce();
+      else drawFullIce();
+    }
+  }
+
+  function exportImage() {
+    canvas.discardActiveObject();
+    clearLineHandles();
+    const tracingWasVisible = tracingObject && tracingObject.visible;
+    if (tracingObject) tracingObject.visible = false;
+
+    canvas.setZoom(1);
+    canvas.setWidth(currentVirtualWidth);
+    canvas.setHeight(VIRTUAL_HEIGHT);
+    canvas.renderAll();
+
+    const dataURL = canvas.toDataURL({ format: 'png', multiplier: 2 });
+
+    if (tracingObject && tracingWasVisible) {
+      tracingObject.visible = true;
+    }
+
+    resizeCanvasToFit();
+
+    const link = document.createElement('a');
+    link.download = `hockey_drill_${Date.now()}.png`;
+    link.href = dataURL;
+    link.click();
+  }
+
+  async function saveToLibrary() {
+    const drills = await getDrills();
+    const title = prompt('Введите название схемы:', 'Упражнение №' + (drills.length + 1));
+    if (!title) return;
+
+    clearLineHandles();
+    const tracingWasVisible = tracingObject && tracingObject.visible;
+    if (tracingObject) tracingObject.visible = false;
+    canvas.discardActiveObject();
+
+    const canvasObjectsToSave = canvas.getObjects().filter(obj => obj !== tracingObject && obj.name !== 'rink_bg' && !obj.isControlHandle);
+    const canvasData = {
+      objects: canvasObjectsToSave.map(obj => obj.toObject([
+        'name', 'customType', 'playerRole', 'playerNumber', 
+        'isStampMode', 'controlPoints', 'linePattern', 'lineColor', 'lineEnding'
+      ])),
+      background: canvas.backgroundColor
+    };
+    const json = JSON.stringify(canvasData);
+
+    const thumb = canvas.toDataURL({ format: 'jpeg', quality: 0.6, multiplier: 0.3 });
+    const originalZoom = canvas.getZoom();
+    canvas.setZoom(1);
+    canvas.setWidth(currentVirtualWidth);
+    canvas.setHeight(VIRTUAL_HEIGHT);
+    canvas.renderAll();
+    const highResImage = canvas.toDataURL({ format: 'png', multiplier: 2 });
+
+    if (tracingObject && tracingWasVisible) {
+      tracingObject.visible = true;
+    }
+
+    resizeCanvasToFit();
+
+    let finalTitle = title;
+    let duplicateCount = 0;
+    drills.forEach(d => {
+      if (d.title === title || d.title.startsWith(title + " (вариант")) {
+        duplicateCount++;
+      }
+    });
+    if (duplicateCount > 0) {
+      finalTitle = `${title} (вариант ${duplicateCount + 1})`;
+    }
+
+    const now = Date.now();
+    drills.push({
+      id: now,
+      createdAt: now,
+      title: finalTitle,
+      thumb: thumb,
+      fullImage: highResImage,
+      data: json,
+      isHalfRink: (currentRinkType !== 'full'),
+      rinkType: currentRinkType,
+      aspectRatio: currentVirtualWidth / VIRTUAL_HEIGHT
+    });
+
+    await saveDrills(drills);
+    alert(`Схема сохранена как «${finalTitle}»!`);
+  }
+
+  async function exportDatabaseJSON() {
+    const drills = await getDrills();
+    if (drills.length === 0) {
+      alert('У вас пока нет сохраненных упражнений для экспорта.');
+      return;
+    }
+    
+    const dataStr = JSON.stringify(drills, null, 2);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `hockey_drills_backup_${dateStr}.json`;
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const file = new File([blob], fileName, { type: 'application/json' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Резервная копия схем',
+          text: 'База упражнений хоккейного планшета'
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.warn('Ошибка при вызове share, скачиваем файлом:', err);
+      }
+    }
+
+    saveAs(blob, fileName);
+  }
+
+  function importDatabaseJSON(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(event) {
+      try {
+        const importedDrills = JSON.parse(event.target.result);
+        if (!Array.isArray(importedDrills)) {
+          alert('Ошибка: выбран неверный файл базы данных.');
+          return;
+        }
+
+        const currentDrills = await getDrills();
+        const existingIds = new Set(currentDrills.map(d => d.id));
+        const existingTitles = new Set(currentDrills.map(d => d.title));
+        let addedCount = 0;
+
+        const finalDrills = [...currentDrills];
+        importedDrills.forEach(d => {
+          if (existingIds.has(d.id) || existingTitles.has(d.title)) {
+            let baseTitle = d.title.replace(/ \(вариант \d+\)$/, "");
+            let variantNum = 2;
+            let newTitle = `${baseTitle} (вариант ${variantNum})`;
+            
+            while (existingTitles.has(newTitle)) {
+              variantNum++;
+              newTitle = `${baseTitle} (вариант ${variantNum})`;
+            }
+
+            d.id = Date.now() + Math.floor(Math.random() * 10000);
+            d.title = newTitle;
+            existingTitles.add(newTitle);
+          }
+
+          if (!d.createdAt) d.createdAt = d.id || Date.now();
+
+          finalDrills.push(d);
+          existingIds.add(d.id);
+          existingTitles.add(d.title);
+          addedCount++;
+        });
+
+        await saveDrills(finalDrills);
+        alert(`Импорт завершен! Автоматически добавлено упражнений: ${addedCount}`);
+        e.target.value = '';
+      } catch (err) {
+        alert('Ошибка при чтении файла базы: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleMultipleDrillsUpload(e) {
+    const files = Array.from(e.target.files);
+    if (!files || files.length === 0) return;
+
+    let addedCount = 0;
+    const drills = await getDrills();
+    const existingTitles = new Set(drills.map(d => d.title));
+
+    for (const file of files) {
+      let title = file.name.replace(/\.[^/.]+$/, "");
+
+      if (existingTitles.has(title)) {
+        let variantNum = 2;
+        let newTitle = `${title} (вариант ${variantNum})`;
+        while (existingTitles.has(newTitle)) {
+          variantNum++;
+          newTitle = `${title} (вариант ${variantNum})`;
+        }
+        title = newTitle;
+      }
+      existingTitles.add(title);
+
+      try {
+        const rawDataUrl = await readFileAsDataURLAsync(file);
+        const { thumbData, optimizedImage, isHalf, aspectRatio } = await processImageMetricsAsync(rawDataUrl);
+
+        const now = Date.now() + Math.floor(Math.random() * 10000);
+        drills.push({
+          id: now,
+          createdAt: now,
+          title: title,
+          thumb: thumbData,
+          fullImage: optimizedImage,
+          data: null,
+          isUploadedImage: true,
+          isHalfRink: isHalf,
+          aspectRatio: aspectRatio
+        });
+
+        addedCount++;
+      } catch (err) {
+        alert(`Ошибка при обработке файла "${file.name}": ${err.message}`);
+      }
+    }
+
+    try {
+      await saveDrills(drills);
+      alert(`Успешно загружено схем с ПК: ${addedCount}`);
+    } catch (quotaErr) {
+      alert("Ошибка сохранения в IndexedDB: " + quotaErr.message);
+    }
+
+    e.target.value = '';
+  }
+
+  function readFileAsDataURLAsync(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target.result);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function processImageMetricsAsync(dataUrl) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const aspect = img.width / img.height;
+        const isHalf = (aspect < 1.45);
+
+        const thumbCanvas = document.createElement('canvas');
+        const tw = 240;
+        const th = tw / aspect || 130;
+        thumbCanvas.width = tw;
+        thumbCanvas.height = th;
+        const tCtx = thumbCanvas.getContext('2d');
+        tCtx.drawImage(img, 0, 0, tw, th);
+        const thumbData = thumbCanvas.toDataURL('image/jpeg', 0.7);
+
+        const optCanvas = document.createElement('canvas');
+        const maxDim = 1400;
+        let ow = img.width;
+        let oh = img.height;
+        if (ow > maxDim || oh > maxDim) {
+          if (ow > oh) {
+            oh = Math.round((oh * maxDim) / ow);
+            ow = maxDim;
+          } else {
+            ow = Math.round((ow * maxDim) / oh);
+            oh = maxDim;
+          }
+        }
+        optCanvas.width = ow;
+        optCanvas.height = oh;
+        const oCtx = optCanvas.getContext('2d');
+        oCtx.drawImage(img, 0, 0, ow, oh);
+        const optimizedImage = optCanvas.toDataURL('image/jpeg', 0.85);
+
+        resolve({ thumbData, optimizedImage, isHalf, aspectRatio: aspect });
+      };
+      img.onerror = () => reject(new Error("Не удалось прочитать изображение"));
+      img.src = dataUrl;
+    });
+  }
+
+  function sortDrillsArray(arr, sortType) {
+    if (sortType === 'newest') {
+      return arr.sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
+    } else if (sortType === 'oldest') {
+      return arr.sort((a, b) => (a.createdAt || a.id) - (b.createdAt || b.id));
+    } else if (sortType === 'title') {
+      return arr.sort((a, b) => a.title.localeCompare(b.title));
+    }
+    return arr;
+  }
+
+  async function openHistoryModal() {
+    const modal = document.getElementById('historyModal');
+    const searchInput = document.getElementById('librarySearchInput');
+    if (searchInput) searchInput.value = '';
+    await renderLibraryModalGrid();
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeHistoryModal() {
+    const modal = document.getElementById('historyModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function renderLibraryModalGrid() {
+    const list = document.getElementById('savedDrillsList');
+    const searchInput = document.getElementById('librarySearchInput');
+    const sortSelect = document.getElementById('librarySortSelect');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const sortType = sortSelect ? sortSelect.value : 'newest';
+
+    list.innerHTML = '';
+    let drills = await getDrills();
+
+    if (query) {
+      drills = drills.filter(d => d.title.toLowerCase().includes(query));
+    }
+
+    drills = sortDrillsArray(drills, sortType);
+
+    if (drills.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-muted); padding:10px; grid-column:1/-1;">Нет схем в библиотеке.</div>';
+      return;
+    }
+
+    drills.forEach(d => {
+      const card = document.createElement('div');
+      card.className = 'drill-item';
+      card.innerHTML = `
+        <img src="${d.thumb}" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="Нажмите для просмотра на весь экран">
+        <span class="btn-preview-zoom" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="На весь экран"><i class="ph ph-magnifying-glass-plus"></i></span>
+        ${d.isHalfRink ? '<span class="badge-half">1/2 поля</span>' : ''}
+        <div class="drill-item-info">
+          <span style="font-size:11px; font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:80px;" title="${d.title}">${d.title}</span>
+          <div style="display:flex; gap:3px;">
+            <button onclick="loadDrill(${d.id}); event.stopPropagation();" title="Открыть для редактирования"><i class="ph ph-pencil-simple"></i></button>
+            <button onclick="renameDrill(${d.id}); event.stopPropagation();" title="Переименовать"><i class="ph ph-textbox"></i></button>
+            <button class="btn-danger" onclick="deleteDrillFromLibrary(${d.id}); event.stopPropagation();" title="Удалить"><i class="ph ph-trash"></i></button>
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  function openImagePreview(imgSrc, title) {
+    document.getElementById('previewModalImg').src = imgSrc;
+    document.getElementById('previewModalTitle').textContent = title;
+    document.getElementById('imagePreviewModal').style.display = 'flex';
+  }
+
+  function closeImagePreview() {
+    document.getElementById('imagePreviewModal').style.display = 'none';
+  }
+
+  async function renameDrill(id) {
+    let drills = await getDrills();
+    const drill = drills.find(item => item.id === id);
+    if (!drill) return;
+
+    const newTitle = prompt('Введите новое название схемы:', drill.title);
+    if (!newTitle || !newTitle.trim()) return;
+
+    drill.title = newTitle.trim();
+    await saveDrills(drills);
+    await renderLibraryModalGrid();
+  }
+
+  async function deleteDrillFromLibrary(id) {
+    if (!confirm('Удалить эту схему из библиотеки?')) return;
+    let drills = await getDrills();
+    drills = drills.filter(d => d.id !== id);
+    await saveDrills(drills);
+    await renderLibraryModalGrid();
+  }
+
+  async function loadDrill(id) {
+    const drills = await getDrills();
+    const d = drills.find(item => item.id === id);
+    if (!d) return;
+
+    const loadAndRender = (canvasData) => {
+      canvas.clear();
+      clearLineHandles();
+      const rType = d.rinkType || (d.isHalfRink ? 'half' : 'full');
+      currentRinkType = rType;
+      currentVirtualWidth = (rType === 'full') ? VIRTUAL_WIDTH_FULL : VIRTUAL_WIDTH_HALF;
+
+      document.getElementById('btnFullRink').classList.toggle('active', rType === 'full');
+      document.getElementById('btnHalfRink').classList.toggle('active', rType === 'half');
+      document.getElementById('btnNeutralZone').classList.toggle('active', rType === 'neutral_zone');
+
+      if (rType === 'half') drawHalfIceWithoutReset();
+      else if (rType === 'neutral_zone') drawNeutralZoneWithoutReset();
+      else drawFullIceWithoutReset();
+
+      if (canvasData && canvasData.objects) {
+        fabric.util.enlivenObjects(canvasData.objects, (enlivenedObjects) => {
+          enlivenedObjects.forEach(obj => {
+            if (obj.customType === 'tactical_trajectory') {
+              obj.hasControls = false;
+              obj.hasBorders = false;
+            }
+            canvas.add(obj);
+          });
+          lockBackgroundObjects();
+          resizeCanvasToFit();
+          canvas.renderAll();
+          saveState();
+        });
+      } else {
+        fabric.Image.fromURL(d.fullImage, (img) => {
+          img.scaleToWidth(currentVirtualWidth);
+          img.scaleToHeight(VIRTUAL_HEIGHT);
+          img.set({ selectable: false, evented: false, name: 'rink_bg' });
+          canvas.add(img);
+          lockBackgroundObjects();
+          resizeCanvasToFit();
+          canvas.renderAll();
+          saveState();
+        });
+      }
+    };
+
+    if (d.data) {
+      try {
+        const parsed = JSON.parse(d.data);
+        loadAndRender(parsed);
+      } catch (err) {
+        loadAndRender(null);
+      }
+    } else {
+      loadAndRender(null);
+    }
+
+    closeHistoryModal();
+  }
+
+  function drawFullIceWithoutReset() {
+    const totalW = VIRTUAL_WIDTH_FULL;
+    const totalH = VIRTUAL_HEIGHT;
+    const m = RINK_M_TO_PX;
+    const leftX = RINK_LEFT_OFFSET;
+    const rightX = leftX + RINK_LENGTH_PX;
+    const topY = RINK_TOP_OFFSET;
+    const bottomY = topY + RINK_WIDTH_PX;
+    const centerY = (topY + bottomY) / 2;
+    const centerX = leftX + RINK_LENGTH_PX / 2;
+
+    const red = '#dc2626';
+    const blue = '#2563eb';
+
+    const base = new fabric.Rect({ left: 0, top: 0, width: totalW, height: totalH, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
+
+    const boards = new fabric.Rect({
+      left: leftX, top: topY, width: RINK_LENGTH_PX, height: RINK_WIDTH_PX,
+      fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4,
+      rx: RINK_CORNER_RADIUS_PX, ry: RINK_CORNER_RADIUS_PX,
+      selectable: false, evented: false, name: 'rink_bg'
+    });
+    canvas.add(base, boards);
+
+    const goalLineDist = 3.35 * m;
+    const R_px = RINK_CORNER_RADIUS_PX;
+    const dy_from_center_of_arc = Math.sqrt(Math.max(0, R_px * R_px - Math.pow(R_px - goalLineDist, 2)));
+    const goalLineHalfLen = (RINK_WIDTH_PX / 2 - R_px) + dy_from_center_of_arc;
+
+    const goalLineLX = leftX + goalLineDist;
+    const goalLineRX = rightX - goalLineDist;
+    const goalLineL = new fabric.Line([goalLineLX, centerY - goalLineHalfLen, goalLineLX, centerY + goalLineHalfLen], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
+    const goalLineR = new fabric.Line([goalLineRX, centerY - goalLineHalfLen, goalLineRX, centerY + goalLineHalfLen], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
+
+    const blueDist = 22.86 * m;
+    const blueWidth = 0.3 * m;
+    const blueLineLX = leftX + blueDist;
+    const blueLineRX = rightX - blueDist;
+    const blueL = new fabric.Line([blueLineLX, topY, blueLineLX, bottomY], { stroke: blue, strokeWidth: blueWidth, selectable: false, evented: false, name: 'rink_bg' });
+    const blueR = new fabric.Line([blueLineRX, topY, blueLineRX, bottomY], { stroke: blue, strokeWidth: blueWidth, selectable: false, evented: false, name: 'rink_bg' });
+
+    const centerRed = new fabric.Line([centerX, topY, centerX, bottomY], { stroke: red, strokeWidth: blueWidth, selectable: false, evented: false, name: 'rink_bg' });
+
+    const centerRadius = 4.5 * m;
+    const centerCircle = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: centerRadius, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const centerDot = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 0.3 * m, fill: blue, selectable: false, evented: false, name: 'rink_bg' });
+
+    const refereeCrease = new fabric.Circle({
+      left: centerX, top: bottomY, originX: 'center', originY: 'center',
+      radius: 3.0 * m, startAngle: Math.PI, endAngle: 2 * Math.PI,
+      fill: 'transparent', stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    const trapGoalHalfW = 3.35 * m;
+    const trapBoardHalfW = 4.265 * m;
+
+    const trapL_Top = new fabric.Line([goalLineLX, centerY - trapGoalHalfW, leftX, centerY - trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const trapL_Bottom = new fabric.Line([goalLineLX, centerY + trapGoalHalfW, leftX, centerY + trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    const trapR_Top = new fabric.Line([goalLineRX, centerY - trapGoalHalfW, rightX, centerY - trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const trapR_Bottom = new fabric.Line([goalLineRX, centerY + trapGoalHalfW, rightX, centerY + trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    const creaseLeftObjs = createOfficialGoalCrease(goalLineLX, centerY, true);
+    const creaseRightObjs = createOfficialGoalCrease(goalLineRX, centerY, false);
+
+    canvas.add(
+      goalLineL, goalLineR, blueL, blueR, centerRed,
+      centerCircle, centerDot, refereeCrease,
+      trapL_Top, trapL_Bottom, trapR_Top, trapR_Bottom,
+      ...creaseLeftObjs, ...creaseRightObjs
+    );
+
+    const faceoffDistX = 6.1 * m;
+    const faceoffDistY = 6.7 * m;
+    const endFaceoffSpots = [
+      { x: goalLineLX + faceoffDistX, y: centerY - faceoffDistY },
+      { x: goalLineLX + faceoffDistX, y: centerY + faceoffDistY },
+      { x: goalLineRX - faceoffDistX, y: centerY - faceoffDistY },
+      { x: goalLineRX - faceoffDistX, y: centerY + faceoffDistY }
+    ];
+    endFaceoffSpots.forEach(pt => drawFaceoffCircle(pt.x, pt.y, red));
+
+    const neutralDistX = 1.5 * m;
+    const neutralSpots = [
+      { x: blueLineLX + neutralDistX, y: centerY - faceoffDistY },
+      { x: blueLineLX + neutralDistX, y: centerY + faceoffDistY },
+      { x: blueLineRX - neutralDistX, y: centerY - faceoffDistY },
+      { x: blueLineRX - neutralDistX, y: centerY + faceoffDistY }
+    ];
+    neutralSpots.forEach(pt => {
+      canvas.add(new fabric.Circle({ left: pt.x, top: pt.y, originX: 'center', originY: 'center', radius: 0.3 * m, fill: red, selectable: false, evented: false, name: 'rink_bg' }));
+    });
+
+    const benchW = 8 * m;
+    canvas.add(new fabric.Rect({ left: centerX - benchW - 2 * m, top: topY - 7, width: benchW, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX + 2 * m, top: topY - 7, width: benchW, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX - 6 * m, top: bottomY + 1, width: 4.5 * m, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX - 1.5 * m, top: bottomY + 1, width: 3 * m, height: 6, fill: '#ef4444', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX + 1.5 * m, top: bottomY + 1, width: 4.5 * m, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+
+    lockBackgroundObjects();
+  }
+
+  function drawHalfIceWithoutReset() {
+    const totalW = VIRTUAL_WIDTH_HALF;
+    const totalH = VIRTUAL_HEIGHT;
+    const m = RINK_M_TO_PX;
+    const leftX = 20;
+    const rightX = totalW;
+    const topY = RINK_TOP_OFFSET;
+    const bottomY = topY + RINK_WIDTH_PX;
+    const centerY = (topY + bottomY) / 2;
+
+    const red = '#dc2626';
+    const blue = '#2563eb';
+
+    const base = new fabric.Rect({ left: 0, top: 0, width: totalW, height: totalH, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
+
+    const boardsHalfPath = `M ${rightX} ${topY} L ${leftX + RINK_CORNER_RADIUS_PX} ${topY} A ${RINK_CORNER_RADIUS_PX} ${RINK_CORNER_RADIUS_PX} 0 0 0 ${leftX} ${topY + RINK_CORNER_RADIUS_PX} L ${leftX} ${bottomY - RINK_CORNER_RADIUS_PX} A ${RINK_CORNER_RADIUS_PX} ${RINK_CORNER_RADIUS_PX} 0 0 0 ${leftX + RINK_CORNER_RADIUS_PX} ${bottomY} L ${rightX} ${bottomY} Z`;
+    const boards = new fabric.Path(boardsHalfPath, { fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, selectable: false, evented: false, name: 'rink_bg' });
+    canvas.add(base, boards);
+
+    const centerRed = new fabric.Line([rightX - 2, topY, rightX - 2, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+
+    const centerRadius = 4.5 * m;
+    const centerCircleHalf = new fabric.Circle({
+      left: rightX, top: centerY, originX: 'center', originY: 'center',
+      radius: centerRadius, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2,
+      fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const centerDotHalf = new fabric.Circle({
+      left: rightX, top: centerY, originX: 'center', originY: 'center',
+      radius: 0.3 * m, startAngle: Math.PI / 2, endAngle: (3 * Math.PI) / 2,
+      fill: blue, selectable: false, evented: false, name: 'rink_bg' });
+
+    const blueLineX = rightX - (7.14 * m);
+    const blueLine = new fabric.Line([blueLineX, topY, blueLineX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+
+    const goalLineDist = 3.35 * m;
+    const R_px = RINK_CORNER_RADIUS_PX;
+    const dy_from_center_of_arc = Math.sqrt(Math.max(0, R_px * R_px - Math.pow(R_px - goalLineDist, 2)));
+    const goalLineHalfLen = (RINK_WIDTH_PX / 2 - R_px) + dy_from_center_of_arc;
+
+    const goalLineX = leftX + goalLineDist;
+    const goalLine = new fabric.Line([goalLineX, centerY - goalLineHalfLen, goalLineX, centerY + goalLineHalfLen], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
+
+    const trapGoalHalfW = 3.35 * m;
+    const trapBoardHalfW = 4.265 * m;
+    const trapLine1 = new fabric.Line([goalLineX, centerY - trapGoalHalfW, leftX, centerY - trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const trapLine2 = new fabric.Line([goalLineX, centerY + trapGoalHalfW, leftX, centerY + trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    const creaseObjs = createOfficialGoalCrease(goalLineX, centerY, true);
+
+    canvas.add(centerRed, centerCircleHalf, centerDotHalf, blueLine, goalLine, trapLine1, trapLine2, ...creaseObjs);
+
+    const faceoffDistX = 6.1 * m;
+    const faceoffDistY = 6.7 * m;
+    drawFaceoffCircle(goalLineX + faceoffDistX, centerY - faceoffDistY, red);
+    drawFaceoffCircle(goalLineX + faceoffDistX, centerY + faceoffDistY, red);
+
+    const neutralX = blueLineX + (1.5 * m);
+    if (neutralX < rightX - 6) {
+      canvas.add(new fabric.Circle({ left: neutralX, top: centerY - faceoffDistY, originX: 'center', originY: 'center', radius: 0.3 * m, fill: red, selectable: false, evented: false, name: 'rink_bg' }));
+      canvas.add(new fabric.Circle({ left: neutralX, top: centerY + faceoffDistY, originX: 'center', originY: 'center', radius: 0.3 * m, fill: red, selectable: false, evented: false, name: 'rink_bg' }));
+    }
+
+    lockBackgroundObjects();
+  }
+
+  function drawNeutralZoneWithoutReset() {
+    const totalW = VIRTUAL_WIDTH_HALF;
+    const totalH = VIRTUAL_HEIGHT;
+    const m = RINK_M_TO_PX;
+    const leftX = 20;
+    const rightX = totalW - 20;
+    const topY = RINK_TOP_OFFSET;
+    const bottomY = topY + RINK_WIDTH_PX;
+    const centerY = (topY + bottomY) / 2;
+    const centerX = (leftX + rightX) / 2;
+
+    const red = '#dc2626';
+    const blue = '#2563eb';
+
+    const base = new fabric.Rect({ left: 0, top: 0, width: totalW, height: totalH, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
+
+    const boards = new fabric.Rect({
+      left: leftX, top: topY, width: rightX - leftX, height: RINK_WIDTH_PX,
+      fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4,
+      selectable: false, evented: false, name: 'rink_bg'
+    });
+    canvas.add(base, boards);
+
+    const blueLineL = new fabric.Line([leftX, topY, leftX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+    const blueLineR = new fabric.Line([rightX, topY, rightX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+
+    const centerRed = new fabric.Line([centerX, topY, centerX, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+
+    const centerRadius = 4.5 * m;
+    const centerCircle = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: centerRadius, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const centerDot = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 0.3 * m, fill: blue, selectable: false, evented: false, name: 'rink_bg' });
+
+    const refereeCrease = new fabric.Circle({
+      left: centerX, top: bottomY, originX: 'center', originY: 'center',
+      radius: 3.0 * m, startAngle: Math.PI, endAngle: 2 * Math.PI,
+      fill: 'transparent', stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    canvas.add(blueLineL, blueLineR, centerRed, centerCircle, centerDot, refereeCrease);
+
+    const neutralDistX = 1.5 * m;
+    const neutralDistY = 6.7 * m;
+    const neutralSpots = [
+      { x: leftX + neutralDistX, y: centerY - neutralDistY },
+      { x: leftX + neutralDistX, y: centerY + neutralDistY },
+      { x: rightX - neutralDistX, y: centerY - neutralDistY },
+      { x: rightX - neutralDistX, y: centerY + neutralDistY }
+    ];
+    neutralSpots.forEach(pt => {
+      canvas.add(new fabric.Circle({ left: pt.x, top: pt.y, originX: 'center', originY: 'center', radius: 0.3 * m, fill: red, selectable: false, evented: false, name: 'rink_bg' }));
+    });
+
+    const benchW = 7 * m;
+    canvas.add(new fabric.Rect({ left: centerX - benchW - 1.5 * m, top: topY - 7, width: benchW, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX + 1.5 * m, top: topY - 7, width: benchW, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX - 5 * m, top: bottomY + 1, width: 4 * m, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX - 1 * m, top: bottomY + 1, width: 2 * m, height: 6, fill: '#ef4444', selectable: false, evented: false, name: 'rink_bg' }));
+    canvas.add(new fabric.Rect({ left: centerX + 1 * m, top: bottomY + 1, width: 4 * m, height: 6, fill: '#94a3b8', selectable: false, evented: false, name: 'rink_bg' }));
+
+    lockBackgroundObjects();
+  }
+
+  function openWorkoutBuilderModal() {
+    const modal = document.getElementById('workoutBuilderModal');
+    document.getElementById('drillSearchInput').value = '';
+    selectedWorkoutDrills = [];
+    updateSelectedCount();
+    renderWorkoutSelectableGrid();
+    renderSelectedQueue();
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeWorkoutBuilderModal() {
+    const modal = document.getElementById('workoutBuilderModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function filterDrillsGrid() {
+    renderWorkoutSelectableGrid();
+  }
+
+  async function renderWorkoutSelectableGrid() {
+    const grid = document.getElementById('workoutSelectableGrid');
+    const searchInput = document.getElementById('drillSearchInput');
+    const sortSelect = document.getElementById('workoutSortSelect');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const sortType = sortSelect ? sortSelect.value : 'newest';
+
+    grid.innerHTML = '';
+    let drills = await getDrills();
+
+    if (query) {
+      drills = drills.filter(d => d.title.toLowerCase().includes(query));
+    }
+
+    drills = sortDrillsArray(drills, sortType);
+
+    if (drills.length === 0) {
+      grid.innerHTML = '<div style="color:var(--text-muted); padding:10px; grid-column:1/-1;">Ничего не найдено.</div>';
+      return;
+    }
+
+    drills.forEach(d => {
+      const card = document.createElement('div');
+      card.className = 'drill-item';
+      card.id = `selectable_drill_${d.id}`;
+      card.innerHTML = `
+        <div class="badge-order" id="badge_order_${d.id}" style="display:none;"></div>
+        <img src="${d.thumb}" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="Нажмите для просмотра на весь экран">
+        <span class="btn-preview-zoom" onclick="openImagePreview('${d.fullImage || d.thumb}', '${d.title}'); event.stopPropagation();" title="На весь экран"><i class="ph ph-magnifying-glass-plus"></i></span>
+        ${d.isHalfRink ? '<span class="badge-half">1/2 поля</span>' : ''}
+        <button class="btn-select-plus" id="btn_plus_${d.id}" onclick="toggleDrillSelection(${d.id}, event)">
+          <i class="ph-bold ph-plus"></i>
+        </button>
+        <div class="drill-item-info">
+          <span style="font-size:11px; font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:110px;" title="${d.title}">${d.title}</span>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    await refreshSelectionBadges();
+  }
+
+  function renderSelectedQueue() {
+    const container = document.getElementById('workoutQueueContainer');
+    const track = document.getElementById('selectedQueueTrack');
+    const countLabel = document.getElementById('queueCountLabel');
+    if (!container || !track) return;
+
+    if (selectedWorkoutDrills.length === 0) {
+      container.style.display = 'none';
+      track.innerHTML = '';
+      return;
+    }
+
+    container.style.display = 'flex';
+    countLabel.textContent = `${selectedWorkoutDrills.length} шт.`;
+    track.innerHTML = '';
+
+    selectedWorkoutDrills.forEach((drill, index) => {
+      const card = document.createElement('div');
+      card.className = 'queue-card';
+      card.innerHTML = `
+        <span class="queue-order-badge">№${index + 1}</span>
+        <img src="${drill.thumb}" onclick="openImagePreview('${drill.fullImage || drill.thumb}', '${drill.title}');" style="cursor:pointer;" title="Нажмите для увеличения">
+        <div class="queue-card-body">
+          <span style="font-size:10px; font-weight:700; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="${drill.title}">${drill.title}</span>
+          <div class="queue-controls">
+            <button ${index === 0 ? 'disabled' : ''} onclick="moveQueueItem(${index}, -1)" title="Сдвинуть влево">◀</button>
+            <button class="btn-danger" onclick="removeFromQueue(${index})" title="Убрать из очереди">✕</button>
+            <button ${index === selectedWorkoutDrills.length - 1 ? 'disabled' : ''} onclick="moveQueueItem(${index}, 1)" title="Сдвинуть вправо">▶</button>
+          </div>
+        </div>
+      `;
+      track.appendChild(card);
+    });
+  }
+
+  function moveQueueItem(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= selectedWorkoutDrills.length) return;
+
+    const item = selectedWorkoutDrills.splice(index, 1)[0];
+    selectedWorkoutDrills.splice(newIndex, 0, item);
+
+    renderSelectedQueue();
+    refreshSelectionBadges();
+  }
+
+  function removeFromQueue(index) {
+    selectedWorkoutDrills.splice(index, 1);
+    renderSelectedQueue();
+    refreshSelectionBadges();
+    updateSelectedCount();
+  }
+
+  async function toggleDrillSelection(id, e) {
+    e.stopPropagation();
+    const drills = await getDrills();
+    const target = drills.find(d => d.id === id);
+    if (!target) return;
+
+    const existingIndex = selectedWorkoutDrills.findIndex(d => d.id === id);
+    if (existingIndex > -1) {
+      selectedWorkoutDrills.splice(existingIndex, 1);
+    } else {
+      selectedWorkoutDrills.push(target);
+    }
+
+    renderSelectedQueue();
+    await refreshSelectionBadges();
+    updateSelectedCount();
+  }
+
+  async function refreshSelectionBadges() {
+    const drills = await getDrills();
+    drills.forEach(d => {
+      const badge = document.getElementById(`badge_order_${d.id}`);
+      const btnPlus = document.getElementById(`btn_plus_${d.id}`);
+      if (!badge || !btnPlus) return;
+
+      const index = selectedWorkoutDrills.findIndex(item => item.id === d.id);
+      if (index > -1) {
+        badge.style.display = 'block';
+        badge.textContent = `№${index + 1}`;
+        btnPlus.classList.add('selected');
+        btnPlus.innerHTML = '<i class="ph-bold ph-check"></i>';
+      } else {
+        badge.style.display = 'none';
+        btnPlus.classList.remove('selected');
+        btnPlus.innerHTML = '<i class="ph-bold ph-plus"></i>';
+      }
+    });
+  }
+
+  function updateSelectedCount() {
+    document.getElementById('selectedCountLabel').textContent = `Выбрано упражнений: ${selectedWorkoutDrills.length}`;
+  }
+
+  function base64ToUint8Array(base64Str) {
+    if (!base64Str) return new Uint8Array();
+    const cleanStr = base64Str.includes(',') ? base64Str.split(',')[1] : base64Str;
+    const binary = atob(cleanStr);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  async function generateWordDocument() {
+    if (selectedWorkoutDrills.length === 0) {
+      alert('Пожалуйста, выберите хотя бы одно упражнение!');
+      return;
+    }
+
+    const btn = document.getElementById('btnGenerateDocx');
+    const originalBtnHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ph-bold ph-spinner"></i> Сборка...';
+
+    try {
+      const docxLib = window.docx;
+      if (!docxLib) {
+        throw new Error('Библиотека docx не загружена.');
+      }
+
+      const { Document, Paragraph, TextRun, ImageRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, Packer } = docxLib;
+
+      const title = document.getElementById('workoutTitleInput').value.trim() || 'Лед утро 27.07.26';
+      const time = document.getElementById('workoutTimeInput').value.trim() || '';
+      const duration = document.getElementById('workoutDurationInput').value.trim() || '';
+
+      const gridBorder = { style: BorderStyle.SINGLE, size: 8, color: "334155" };
+      const children = [];
+
+      const headerTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder, insideHorizontal: gridBorder, insideVertical: gridBorder },
+        rows: [
+          new TableRow({
+            cantSplit: true,
+            children: [
+              new TableCell({
+                width: { size: 45, type: WidthType.PERCENTAGE },
+                borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.START,
+                    spacing: { before: 40, after: 40 },
+                    children: [new TextRun({ text: title, bold: true, size: 24, font: "Arial" })]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 40, after: 40 },
+                    children: [new TextRun({ text: time, bold: true, size: 24, font: "Arial" })]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 40, after: 40 },
+                    children: [new TextRun({ text: duration, bold: true, size: 24, font: "Arial" })]
+                  })
+                ]
+              })
+            ]
+          })
+        ]
+      });
+
+      children.push(headerTable);
+      children.push(new Paragraph({ spacing: { after: 120 } }));
+
+      const slots = [];
+      let idx = 0;
+
+      while (idx < selectedWorkoutDrills.length) {
+        const current = selectedWorkoutDrills[idx];
+        const next = selectedWorkoutDrills[idx + 1];
+
+        if (current.isHalfRink && next && next.isHalfRink) {
+          slots.push({ type: 'pair_half', items: [current, next] });
+          idx += 2;
+        } else {
+          slots.push({ type: 'single', item: current });
+          idx += 1;
+        }
+      }
+
+      for (let s = 0; s < slots.length; s++) {
+        const slot = slots[s];
+
+        if (slot.type === 'single') {
+          const drill = slot.item;
+          const imgBytes = base64ToUint8Array(drill.fullImage || drill.thumb);
+
+          const targetWidth = drill.isHalfRink ? 380 : 570;
+          const targetHeight = drill.isHalfRink ? 280 : 270;
+
+          const cardTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder, insideHorizontal: gridBorder, insideVertical: gridBorder },
+            rows: [
+              new TableRow({
+                cantSplit: true,
+                children: [
+                  new TableCell({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        keepWithNext: true,
+                        spacing: { before: 60, after: 60 },
+                        children: [
+                          new TextRun({
+                            text: drill.title,
+                            bold: true,
+                            size: 24,
+                            font: "Arial"
+                          })
+                        ]
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 80 },
+                        children: [
+                          new ImageRun({
+                            data: imgBytes,
+                            transformation: {
+                              width: targetWidth,
+                              height: targetHeight
+                            }
+                          })
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              })
+            ]
+          });
+
+          children.push(cardTable);
+          children.push(new Paragraph({ spacing: { after: 120 } }));
+
+        } else if (slot.type === 'pair_half') {
+          const d1 = slot.items[0];
+          const d2 = slot.items[1];
+          const bytes1 = base64ToUint8Array(d1.fullImage || d1.thumb);
+          const bytes2 = base64ToUint8Array(d2.fullImage || d2.thumb);
+
+          const pairTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
+            rows: [
+              new TableRow({
+                cantSplit: true,
+                children: [
+                  new TableCell({
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        keepWithNext: true,
+                        spacing: { before: 60, after: 60 },
+                        children: [new TextRun({ text: d1.title, bold: true, size: 22, font: "Arial" })]
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 80 },
+                        children: [
+                          new ImageRun({
+                            data: bytes1,
+                            transformation: { width: 275, height: 250 }
+                          })
+                        ]
+                      })
+                    ]
+                  }),
+                  new TableCell({
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    borders: { top: gridBorder, bottom: gridBorder, left: gridBorder, right: gridBorder },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        keepWithNext: true,
+                        spacing: { before: 60, after: 60 },
+                        children: [new TextRun({ text: d2.title, bold: true, size: 22, font: "Arial" })]
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 80 },
+                        children: [
+                          new ImageRun({
+                            data: bytes2,
+                            transformation: { width: 275, height: 250 }
+                          })
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              })
+            ]
+          });
+
+          children.push(pairTable);
+          children.push(new Paragraph({ spacing: { after: 120 } }));
+        }
+      }
+
+      const doc = new Document({
+        sections: [{
+          properties: {
+            page: {
+              margin: {
+                top: 720,
+                right: 720,
+                bottom: 720,
+                left: 720
+              }
+            }
+          },
+          children: children
+        }]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `${title}.docx`);
+      closeWorkoutBuilderModal();
+
+    } catch (err) {
+      console.error("Ошибка DOCX:", err);
+      alert('Ошибка при формировании Word документа: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnHtml;
+    }
+  }
+</script>
+</body>
+</html>
