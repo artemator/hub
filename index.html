@@ -190,13 +190,13 @@
 
     let html = '';
 
-    // 1 вратарь, проведший больше времени на площадке
+    // 1 вратарь с наибольшим временем на льду
     if (goalies.length > 0) {
       const bestGoalie = [...goalies].sort((a, b) => (b.toiSeconds || 0) - (a.toiSeconds || 0))[0];
       html += `<div>🏒 <b>Основной вратарь:</b> #${bestGoalie.num || '—'} ${bestGoalie.name} (ВП: ${bestGoalie.toi || '—'}, Штр: ${bestGoalie.pim || 0})</div>`;
     }
 
-    // Полевые игроки: все кто набрал очки (>0), либо топ-5 по времени/очкам
+    // Полевые игроки: набравшие очки, либо топ-5 по времени/очкам
     const scorers = skaters.filter(p => {
       const pts = (parseInt(p.pts) || (parseInt(p.g) || 0) + (parseInt(p.a) || 0));
       return pts > 0;
