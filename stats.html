@@ -1,10 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Полная статистика матча и аналитика | Центр тренера</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Надежное подключение localforage с cdnjs и unpkg -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0b1120;
+      --panel-bg: #151f32;
+      --card-bg: #1e293b;
+      --border-color: #2b3952;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      z-index: 50;
+    }
+    .nav-links-hub { display: flex; align-items: center; gap: 8px; }
+    .nav-btn-link {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .nav-btn-link:hover { background: rgba(255,255,255,0.06); color: var(--text-main); }
+    .nav-btn-link.active { background: #0284c7; color: #fff; border-color: var(--accent-blue); }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      overflow-y: auto;
+      max-width: 1500px;
+      width: 100%;
+      margin: 0 auto;
+      gap: 16px;
+    }
+    .match-header-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .score-badge {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--accent-blue);
+      background: #090e17;
+      border: 1px solid var(--border-color);
+      padding: 4px 16px;
+      border-radius: 8px;
+    }
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: #090e17;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    select, button {
+      background: #1e293b;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #334155; }
+    button.active { background: #0284c7; border-color: var(--accent-blue); }
+    .section-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .table-wrapper {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow-x: auto;
+      max-height: 520px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    th {
+      background: #1e293b;
+      padding: 8px 6px;
+      color: var(--text-muted);
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    td {
+      padding: 6px 6px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    tr:hover td { background: rgba(56, 189, 248, 0.05); }
+  </style>
+</head>
+<body>
+
+<header>
+  <nav class="nav-links-hub">
+    <a href="./index.html" class="nav-btn-link"><i class="ph-bold ph-calendar-check"></i> Центр управления</a>
+    <a href="./tablet.html" class="nav-btn-link"><i class="ph-bold ph-hockey-puck"></i> Планшет тренера</a>
+    <a href="./stats.html" class="nav-btn-link active"><i class="ph-bold ph-chart-bar"></i> Полная статистика</a>
+  </nav>
+  <button onclick="window.location.href='./index.html'" class="btn-accent">
+    <i class="ph-bold ph-arrow-left"></i> В календарь
+  </button>
+</header>
+
+<main class="main-container">
+  <div class="match-header-card">
+    <div>
+      <div style="font-size:12px; color:var(--text-muted);" id="statDateLabel">Дата: —</div>
+      <h2 style="font-size:1.3rem; margin-top:4px;" id="statOpponentLabel">Матч: —</h2>
+      <div style="font-size:12px; color:var(--accent-green); margin-top:2px;" id="statTypeLabel">Официальный матч</div>
+    </div>
+    <div class="score-badge" id="statScoreBadge">— : —</div>
+  </div>
+
+  <!-- ПАНЕЛЬ РЕЖИМОВ СТАТИСТИКИ И AVG-АНАЛИТИКИ -->
+  <div class="filter-bar">
+    <span style="font-size:12px; font-weight:700; color:var(--text-muted);">РЕЖИМ ОТОБРАЖЕНИЯ:</span>
+    <button id="btnViewSingle" class="active" onclick="switchViewMode('single')">
+      <i class="ph-bold ph-calendar"></i> Этот матч (вся таблица МХЛ)
+    </button>
+    <button id="btnViewAllAvg" onclick="switchViewMode('avg_all')">
+      <i class="ph-bold ph-calculator"></i> Средняя (AVG) за все матчи
+    </button>
+    <div style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+      <span style="font-size:11px; color:var(--text-muted);">Соперник:</span>
+      <select id="opponentSelect" onchange="switchViewMode('avg_opponent')"></select>
+      <button id="btnViewOpponentAvg" onclick="switchViewMode('avg_opponent')">
+        <i class="ph-bold ph-crosshair"></i> AVG против соперника
+      </button>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <h3 style="font-size:14px; color:var(--accent-blue); display:flex; align-items:center; gap:6px;">
+      <i class="ph-bold ph-shield"></i> Вратари
+    </h3>
+    <div class="table-wrapper">
+      <table id="goaliesTable">
+        <thead id="goaliesThead"></thead>
+        <tbody id="goaliesTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <h3 style="font-size:14px; color:var(--accent-amber); display:flex; align-items:center; gap:6px;">
+      <i class="ph-bold ph-users-three"></i> Полевые игроки (Защитники и Нападающие)
+    </h3>
+    <div class="table-wrapper">
+      <table id="skatersTable">
+        <thead id="skatersThead"></thead>
+        <tbody id="skatersTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
 <script>
-  localforage.config({ name: 'HockeyCoachHub', storeName: 'coach_hub_calendar' });
+  // 1. НАДЕЖНЫЙ FALLBACK НА СЛУЧАЙ СБОЯ CDN:
+  (function initStorage() {
+    if (typeof window.localforage === 'undefined') {
+      window.localforage = {
+        config: function() {},
+        getItem: async function(key) {
+          try { return JSON.parse(localStorage.getItem(key)); } catch(e) { return null; }
+        },
+        setItem: async function(key, val) {
+          try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+        }
+      };
+    } else {
+      try {
+        window.localforage.config({ name: 'HockeyCoachHub', storeName: 'coach_hub_calendar' });
+      } catch(e) {}
+    }
+  })();
 
   let allDaysData = {};
   let currentDateKey = null;
   let currentOpponent = '';
-  let viewMode = 'single'; // 'single' | 'avg_all' | 'avg_opponent'
+  let viewMode = 'single';
 
   const SKATER_HEADERS_MHL = [
     "№", "Игрок", "И", "Ш", "А", "О", "+/-", "+", "-", "Штр", "ШР", "ШБ", "ШМ", "ШО", "ШП",
@@ -15,7 +255,12 @@
     const params = new URLSearchParams(window.location.search);
     currentDateKey = params.get('date');
 
-    allDaysData = await localforage.getItem('hockey_hub_days') || {};
+    try {
+      allDaysData = await window.localforage.getItem('hockey_hub_days') || {};
+    } catch(e) {
+      allDaysData = {};
+    }
+
     populateOpponentSelect();
 
     if (currentDateKey && allDaysData[currentDateKey]) {
@@ -29,6 +274,8 @@
     } else {
       document.getElementById('statOpponentLabel').textContent = 'Общая аналитика команды';
       viewMode = 'avg_all';
+      document.getElementById('btnViewSingle').classList.remove('active');
+      document.getElementById('btnViewAllAvg').classList.add('active');
     }
 
     renderAllTables();
@@ -36,10 +283,11 @@
 
   function populateOpponentSelect() {
     const select = document.getElementById('opponentSelect');
+    if (!select) return;
     select.innerHTML = '<option value="">-- Выберите соперника --</option>';
     const opponents = new Set();
     Object.values(allDaysData).forEach(day => {
-      if (day.match && day.match.opponent) opponents.add(day.match.opponent.trim());
+      if (day && day.match && day.match.opponent) opponents.add(day.match.opponent.trim());
     });
     opponents.forEach(opp => {
       const opt = document.createElement('option');
@@ -65,7 +313,7 @@
     } else if (viewMode === 'avg_opponent') {
       const opp = document.getElementById('opponentSelect').value;
       if (!opp) {
-        alert('Пожалуйста, выберите соперника из списка!');
+        alert('Пожалуйста, выберите соперника из выпадающего списка!');
         return;
       }
       renderAvgTables(opp);
@@ -76,7 +324,11 @@
     const day = allDaysData[currentDateKey] || {};
     const players = day.players || [];
 
-    document.getElementById('goaliesThead').innerHTML = `
+    const gThead = document.getElementById('goaliesThead');
+    const sThead = document.getElementById('skatersThead');
+    if (!gThead || !sThead) return;
+
+    gThead.innerHTML = `
       <tr>
         <th style="width:40px;">№</th>
         <th style="text-align:left;">Вратарь</th>
@@ -87,7 +339,7 @@
     let sHead = '<tr>';
     SKATER_HEADERS_MHL.forEach(h => sHead += `<th>${h}</th>`);
     sHead += '</tr>';
-    document.getElementById('skatersThead').innerHTML = sHead;
+    sThead.innerHTML = sHead;
 
     const gBody = document.getElementById('goaliesTbody');
     const sBody = document.getElementById('skatersTbody');
@@ -101,7 +353,7 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><b>${p.num || '—'}</b></td>
-          <td style="text-align:left;"><b>${p.name}</b></td>
+          <td style="text-align:left;"><b>${p.name || ''}</b></td>
           <td>${raw[0] || '1'}</td><td>${raw[1] || '0'}</td><td>${raw[2] || '0'}</td>
           <td>${raw[3] || '0'}</td><td>${raw[4] || '0'}</td><td>${raw[5] || '0'}</td>
           <td>${raw[6] || '0'}</td><td>${raw[7] || '—'}</td><td>${raw[8] || '—'}</td>
@@ -116,7 +368,7 @@
 
         let rowHtml = `
           <td><b>${p.num || '—'}</b></td>
-          <td style="text-align:left;"><b>${p.name}</b></td>
+          <td style="text-align:left;"><b>${p.name || ''}</b></td>
           <td>${raw[0] || '1'}</td>
           <td style="color:var(--accent-green); font-weight:bold;">${p.g || '0'}</td>
           <td>${p.a || '0'}</td>
@@ -142,7 +394,11 @@
     document.getElementById('statOpponentLabel').textContent = `Средняя статистика (AVG) ${oppLabel}`;
     document.getElementById('statScoreBadge').textContent = 'AVG';
 
-    document.getElementById('goaliesThead').innerHTML = `
+    const gThead = document.getElementById('goaliesThead');
+    const sThead = document.getElementById('skatersThead');
+    if (!gThead || !sThead) return;
+
+    gThead.innerHTML = `
       <tr>
         <th style="width:40px;">№</th>
         <th style="text-align:left;">Вратарь</th>
@@ -152,7 +408,7 @@
       </tr>
     `;
 
-    document.getElementById('skatersThead').innerHTML = `
+    sThead.innerHTML = `
       <tr>
         <th style="width:40px;">№</th>
         <th style="text-align:left;">Игрок</th>
@@ -169,8 +425,8 @@
     const sStats = {};
 
     Object.values(allDaysData).forEach(day => {
+      if (!day || !day.match) return;
       const match = day.match;
-      if (!match) return;
       if (opponentFilter && match.opponent?.trim().toLowerCase() !== opponentFilter.trim().toLowerCase()) {
         return;
       }
@@ -235,3 +491,5 @@
     if (sBody.children.length === 0) sBody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted); padding:10px;">Нет данных по игрокам</td></tr>';
   }
 </script>
+</body>
+</html>
