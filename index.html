@@ -545,6 +545,9 @@
               <i class="ph-bold ph-clipboard-text"></i> Вставить с сайта МХЛ
             </button>
             <button onclick="addPlayerRow()" style="padding:4px 9px; font-size:11px;"><i class="ph-bold ph-plus"></i> + Игрок</button>
+          <button onclick="goToFullStatsPage()" class="btn-success" style="padding:4px 9px; font-size:11px;">
+              <i class="ph-bold ph-chart-bar"></i> Полная статистика
+            </button>
           </div>
         </div>
 
@@ -851,7 +854,10 @@
     const trainTitle = encodeURIComponent(document.getElementById('trainTitle').value.trim() || 'Тренировка');
     window.location.href = `./tablet.html?date=${activeSelectedDateKey}&title=${trainTitle}&openWorkout=1`;
   }
-
+function goToFullStatsPage() {
+    saveDayData();
+    window.location.href = `./stats.html?date=${activeSelectedDateKey}`;
+  }
   async function openSelectWorkoutModal() {
     const list = document.getElementById('savedWorkoutsList');
     list.innerHTML = '';
