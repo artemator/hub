@@ -515,6 +515,15 @@
 
       <!-- ВКЛАДКА МАТЧА -->
       <div class="tab-content" id="tabContentMatch">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label style="font-size:11px; font-weight:700; color:var(--text-muted);">СТАТИСТИКА ИГРОКОВ</label>
+          <div style="display:flex; gap:6px;">
+            <button onclick="openMhlPasteModal()" class="btn-accent" style="padding:4px 9px; font-size:11px;">
+              <i class="ph-bold ph-clipboard-text"></i> Вставить с сайта МХЛ
+            </button>
+            <button onclick="addPlayerRow()" style="padding:4px 9px; font-size:11px;"><i class="ph-bold ph-plus"></i> + Игрок</button>
+          </div>
+        </div>
         <div class="form-grid-3">
           <div class="form-group">
             <label>Соперник</label>
@@ -917,6 +926,115 @@
     };
     reader.readAsText(file);
   }
+  function openMhlPasteModal() {
+    document.getElementById('mhlRawInput').value = '';
+    document.getElementById('mhlPasteModal').style.display = 'flex';
+  }
+
+  function closeMhlPasteModal() {
+    document.getElementById('mhlPasteModal').style.display = 'none';
+  }
+
+  function processMhlPastedText() {
+    const rawText = document.getElementById('mhlRawInput').value;
+    if (!rawText.trim()) {
+      alert('Поле пустое. Вставьте скопированный текст.');
+      return;
+    }
+
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    const parsedPlayers = [];
+    let currentCategory = 'skater'; // 'goalie' или 'skater'
+
+    for (let line of lines) {
+      const lower = line.toLowerCase();
+      if (lower.includes('вратари')) {
+        currentCategory = 'goalie';
+        continue;
+      }
+      if (lower.includes('защитники') || lower.includes('нападающие')) {
+        currentCategory = 'skater';
+        continue;
+      }
+      if (lower.startsWith('игрок') || lower.includes('глоссарий') || lower.includes('%об') || lower.includes('%вбр')) {
+        continue;
+      }
+
+      // Разделение по символу табуляции (стандарт при копировании веб-таблиц)
+      let cols = line.split('\t').map(c => c.trim()).filter(Boolean);
+
+      // Если вставилось пробелами, а не табами:
+      if (cols.length < 4) {
+        cols = line.split(/\s{2,}/).map(c => c.trim()).filter(Boolean);
+      }
+
+      if (cols.length >= 3) {
+        const num = cols[0];
+        const name = cols[1];
+
+        // Проверяем, что первая колонка — числовой номер игрока
+        if (!/^\d+$/.test(num)) continue;
+
+        if (currentCategory === 'goalie') {
+          // Для вратарей: №, Имя, И, В, П, ИБ, БВ, ПШ, ОБ, %ОБ, КН, А, И"0", Штр
+          const pim = cols[12] || cols[cols.length - 2] || '0';
+          parsedPlayers.push({
+            num: num,
+            name: `${name} (Вр)`,
+            g: '0',
+            a: cols[10] || '0',
+            plusMinus: '0',
+            pim: isNaN(parseInt(pim)) ? '0' : pim
+          });
+        } else {
+          // Для полевых (Защитники/Нападающие): №, Имя, И, Ш (Гол), А (Пас), О, +/-, +, -, Штр...
+          const g = cols[3] || '0';
+          const a = cols[4] || '0';
+          const pm = cols[6] || '0';
+          const pim = cols[9] || '0';
+
+          parsedPlayers.push({
+            num: num,
+            name: name,
+            g: isNaN(parseInt(g)) ? '0' : g,
+            a: isNaN(parseInt(a)) ? '0' : a,
+            plusMinus: pm,
+            pim: isNaN(parseInt(pim)) ? '0' : pim
+          });
+        }
+      }
+    }
+
+    if (parsedPlayers.length === 0) {
+      alert('Не удалось распознать строки. Убедитесь, что выделили строки с номерами и фамилиями.');
+      return;
+    }
+
+    renderPlayersTable(parsedPlayers);
+    closeMhlPasteModal();
+    alert(`Успешно распознано игроков: ${parsedPlayers.length}`);
+  }
 </script>
+  <!-- МОДАЛЬНОЕ ОКНО ВСТАВКИ СТАТИСТИКИ МХЛ -->
+<div class="modal-overlay" id="mhlPasteModal" onclick="if(event.target===this) closeMhlPasteModal()">
+  <div class="modal-card" style="width: 580px;">
+    <div class="modal-header">
+      <h3 style="font-size: 15px; display:flex; align-items:center; gap:8px;">
+        <i class="ph-bold ph-copy" style="color:var(--accent-blue);"></i> Вставка статистики с сайта МХЛ / КХЛ
+      </h3>
+      <button onclick="closeMhlPasteModal()"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:11px; color:var(--text-muted);">
+        Выделите таблицу игроков на сайте МХЛ мышкой, скопируйте (Ctrl+C) и вставьте сюда (Ctrl+V).
+      </p>
+      <textarea id="mhlRawInput" rows="10" placeholder="Вставьте сюда скопированные строки таблицы МХЛ..." style="font-family:monospace; font-size:11px; white-space:pre;"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeMhlPasteModal()">Отмена</button>
+      <button class="btn-success" onclick="processMhlPastedText()"><i class="ph-bold ph-check"></i> Распознать и заполнить</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
