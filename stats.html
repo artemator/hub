@@ -221,7 +221,7 @@
 </main>
 
 <script>
-  // БЕЗОПАСНЫЙ FALLBACK НА СЛУЧАЙ СБОЯ CDN
+  // Безопасный fallback на случай проблем с сетью или CDN
   (function initStorage() {
     if (typeof window.localforage === 'undefined') {
       window.localforage = {
@@ -245,8 +245,9 @@
   let currentOpponent = '';
   let viewMode = 'single';
 
+  // 25 числовых параметров в точном соответствии с официальной шапкой МХЛ
   const SKATER_HEADERS_MHL = [
-    "№", "Игрок", "И", "Ш", "А", "О", "+/-", "+", "-", "Штр", "ШР", "ШБ", "ШМ", "ШО", "ШП",
+    "И", "Ш", "А", "О", "+/-", "+", "-", "Штр", "ШР", "ШБ", "ШМ", "ШО", "ШП",
     "РБ", "БВ", "%БВ", "Вбр", "ВВбр", "%Вбр", "ВП/И", "См/И", "СПр", "БлБ", "ОТБ", "ПХТ"
   ];
 
@@ -335,7 +336,7 @@
       </tr>
     `;
 
-    let sHead = '<tr>';
+    let sHead = '<tr><th style="width:40px;">№</th><th style="text-align:left;">Игрок</th>';
     SKATER_HEADERS_MHL.forEach(h => sHead += `<th>${h}</th>`);
     sHead += '</tr>';
     sThead.innerHTML = sHead;
@@ -365,6 +366,9 @@
         const tr = document.createElement('tr');
         const pts = (parseInt(p.g) || 0) + (parseInt(p.a) || 0);
 
+        // Ищем индекс времени ММ:СС среди токенов
+        const timeIdx = raw.findIndex(t => /^\d{1,2}:\d{2}$/.test(t));
+
         let rowHtml = `
           <td><b>${p.num || '—'}</b></td>
           <td style="text-align:left;"><b>${p.name || ''}</b></td>
@@ -373,11 +377,22 @@
           <td>${p.a || '0'}</td>
           <td style="font-weight:bold; color:var(--accent-blue);">${pts}</td>
           <td style="font-weight:bold; color:${String(p.plusMinus).startsWith('+') ? 'var(--accent-green)' : (String(p.plusMinus).startsWith('-') ? 'var(--accent-red)' : 'inherit')};">${p.plusMinus || '0'}</td>
-          <td>${raw[4] || '0'}</td><td>${raw[5] || '0'}</td>
+          <td>${raw[4] || '0'}</td>
+          <td>${raw[5] || '0'}</td>
           <td>${p.pim || '0'}</td>
         `;
-        for (let idx = 7; idx < SKATER_HEADERS_MHL.length; idx++) {
-          rowHtml += `<td>${raw[idx] || '0'}</td>`;
+
+        // Отрисовка всех остальных 18 параметров (ШР..ПХТ)
+        for (let idx = 8; idx < SKATER_HEADERS_MHL.length; idx++) {
+          const colName = SKATER_HEADERS_MHL[idx];
+          if (colName === 'ВП/И') {
+            rowHtml += `<td><b>${p.toi && p.toi !== '00:00' ? p.toi : (timeIdx > -1 ? raw[timeIdx] : '—')}</b></td>`;
+          } else if (colName === 'См/И') {
+            const shiftVal = (timeIdx > -1 && raw[timeIdx + 1]) ? raw[timeIdx + 1] : (raw[idx] || '0');
+            rowHtml += `<td>${shiftVal}</td>`;
+          } else {
+            rowHtml += `<td>${raw[idx] || '0'}</td>`;
+          }
         }
         tr.innerHTML = rowHtml;
         sBody.appendChild(tr);
@@ -385,7 +400,7 @@
     });
 
     if (gBody.children.length === 0) gBody.innerHTML = '<tr><td colspan="15" style="color:var(--text-muted); padding:10px;">Вратари не указаны</td></tr>';
-    if (sBody.children.length === 0) sBody.innerHTML = `<tr><td colspan="${SKATER_HEADERS_MHL.length}" style="color:var(--text-muted); padding:10px;">Полевые игроки не указаны</td></tr>`;
+    if (sBody.children.length === 0) sBody.innerHTML = `<tr><td colspan="${SKATER_HEADERS_MHL.length + 2}" style="color:var(--text-muted); padding:10px;">Полевые игроки не указаны</td></tr>`;
   }
 
   function renderAvgTables(opponentFilter) {
@@ -417,8 +432,8 @@
         <th>AVG Очки (О)</th>
         <th>AVG +/-</th>
         <th>AVG Штраф (мин)</th>
-        <th>AVG Время на поле</th>
-        <th>AVG Количество смен</th>
+        <th>AVG Время на поле (ВП/И)</th>
+        <th>AVG Количество смен (См/И)</th>
       </tr>
     `;
 
@@ -446,7 +461,16 @@
           const g = parseInt(p.g) || 0;
           const a = parseInt(p.a) || 0;
           const raw = p.rawMhl || [];
-          const shiftsCount = parseInt(raw[21]) || parseInt(raw[22]) || 0;
+
+          // Смены идут сразу после времени ММ:СС
+          let shiftsCount = 0;
+          const timeIdx = raw.findIndex(t => /^\d{1,2}:\d{2}$/.test(t));
+          if (timeIdx > -1 && raw[timeIdx + 1]) {
+            shiftsCount = parseInt(raw[timeIdx + 1]) || 0;
+          } else {
+            shiftsCount = parseInt(raw[20]) || parseInt(raw[21]) || 0;
+          }
+
           let sec = p.toiSeconds || 0;
           if (!sec && p.toi) {
             const parts = String(p.toi).split(':').map(Number);
