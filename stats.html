@@ -5,7 +5,6 @@
   <title>Полная статистика матча и аналитика | Центр тренера</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <!-- Надежное подключение localforage с cdnjs и unpkg -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
 
   <style>
@@ -222,7 +221,7 @@
 </main>
 
 <script>
-  // 1. НАДЕЖНЫЙ FALLBACK НА СЛУЧАЙ СБОЯ CDN:
+  // БЕЗОПАСНЫЙ FALLBACK НА СЛУЧАЙ СБОЯ CDN
   (function initStorage() {
     if (typeof window.localforage === 'undefined') {
       window.localforage = {
@@ -418,6 +417,8 @@
         <th>AVG Очки (О)</th>
         <th>AVG +/-</th>
         <th>AVG Штраф (мин)</th>
+        <th>AVG Время на поле</th>
+        <th>AVG Количество смен</th>
       </tr>
     `;
 
@@ -441,15 +442,25 @@
           gStats[key].a += parseInt(p.a) || 0;
           gStats[key].pim += parseInt(p.pim) || 0;
         } else {
-          if (!sStats[key]) sStats[key] = { num: p.num, name: p.name, games: 0, g: 0, a: 0, pts: 0, plusMinus: 0, pim: 0 };
+          if (!sStats[key]) sStats[key] = { num: p.num, name: p.name, games: 0, g: 0, a: 0, pts: 0, plusMinus: 0, pim: 0, toiSec: 0, shifts: 0 };
           const g = parseInt(p.g) || 0;
           const a = parseInt(p.a) || 0;
+          const raw = p.rawMhl || [];
+          const shiftsCount = parseInt(raw[21]) || parseInt(raw[22]) || 0;
+          let sec = p.toiSeconds || 0;
+          if (!sec && p.toi) {
+            const parts = String(p.toi).split(':').map(Number);
+            sec = (parts[0] || 0) * 60 + (parts[1] || 0);
+          }
+
           sStats[key].games++;
           sStats[key].g += g;
           sStats[key].a += a;
           sStats[key].pts += (g + a);
           sStats[key].plusMinus += parseInt(p.plusMinus) || 0;
           sStats[key].pim += parseInt(p.pim) || 0;
+          sStats[key].toiSec += sec;
+          sStats[key].shifts += shiftsCount;
         }
       });
     });
@@ -483,12 +494,19 @@
         <td style="color:var(--accent-blue); font-weight:bold;">${(st.pts / st.games).toFixed(2)}</td>
         <td style="font-weight:bold; color:${avgPm > 0 ? 'var(--accent-green)' : (avgPm < 0 ? 'var(--accent-red)' : 'inherit')};">${avgPm > 0 ? '+' + avgPm : avgPm}</td>
         <td>${(st.pim / st.games).toFixed(2)}</td>
+        <td style="font-weight:600;">${(() => {
+          const avgSec = Math.round((st.toiSec || 0) / st.games);
+          const m = Math.floor(avgSec / 60);
+          const s = avgSec % 60;
+          return `${m}:${s < 10 ? '0' : ''}${s}`;
+        })()}</td>
+        <td>${((st.shifts || 0) / st.games).toFixed(1)}</td>
       `;
       sBody.appendChild(tr);
     });
 
     if (gBody.children.length === 0) gBody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted); padding:10px;">Нет данных по вратарям</td></tr>';
-    if (sBody.children.length === 0) sBody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted); padding:10px;">Нет данных по игрокам</td></tr>';
+    if (sBody.children.length === 0) sBody.innerHTML = '<tr><td colspan="10" style="color:var(--text-muted); padding:10px;">Нет данных по игрокам</td></tr>';
   }
 </script>
 </body>
