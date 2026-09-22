@@ -935,12 +935,144 @@
     document.getElementById('mhlPasteModal').style.display = 'none';
   }
 
-  function processMhlPastedText() {
+ function processMhlPastedText() {
     const rawText = document.getElementById('mhlRawInput').value;
     if (!rawText.trim()) {
       alert('Поле пустое. Вставьте скопированный текст.');
       return;
     }
+
+    const parsedPlayers = [];
+
+    // Регулярное выражение для поиска русских фамилий и имён (включая инициалы, букву (К), (А) и т.д.)
+    // Находит конструкции вида: "Скрябин Николай", "Цыганов Егор М. (К)", "Бадиков Арсений"
+    const nameRegex = /([А-ЯЁ][а-яё\-]+(?:\s+[А-ЯЁ][а-яё\-]+|\s+[А-ЯЁ]\.|\s+М\.)*(?:\s*\([КАA-ZА-Я]\))*)/g;
+
+    // Очищаем служебный мусор сайта
+    let cleanText = rawText
+      .replace(/Глоссарий/gi, ' ')
+      .replace(/%ОБ|%ВБР|ВБР|ВВБР|ВП\/И|СМ\/И|СПР|БЛБ|ОТБ|ПХТ/gi, ' ')
+      .replace(/И\s+Ш\s+А\s+О|\+\/-|\bШтр\b|\bВП\b/gi, ' ');
+
+    // 1. Попытка парсинга по строкам, если текст разделен по переводам строк
+    const rawLines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
+    let pendingNum = null;
+
+    for (let i = 0; i < rawLines.length; i++) {
+      let line = rawLines[i];
+
+      // Пропускаем заголовки категорий
+      if (/^(вратари|защитники|нападающие)$/i.test(line)) {
+        continue;
+      }
+
+      // Если в строке стоит только номер игрока (например, "1", "3", "79")
+      if (/^\d{1,2}$/.test(line)) {
+        pendingNum = line;
+        continue;
+      }
+
+      // Ищем совпадение фамилии и имени в начале строки
+      const match = line.match(/^([А-ЯЁ][а-яё\-]+(?:\s+[А-ЯЁ][а-яё\-]+|\s+[А-ЯЁ]\.|\s+М\.)*(?:\s*\([КАA-ZА-Я]\))*)/);
+      if (match) {
+        const playerName = match[1].trim();
+        const playerNum = pendingNum || '';
+        pendingNum = null;
+
+        // Остаток строки после имени содержит склеенные или разделенные цифры
+        const rest = line.substring(match[0].length).trim();
+
+        // Извлекаем показатели полезности и голы:
+        // Ищем +/- (например, "-1", "+2", "0")
+        let plusMinus = '0';
+        const pmMatch = rest.match(/([+-]\d+)/);
+        if (pmMatch) {
+          plusMinus = pmMatch[1];
+        }
+
+        // Если показатели разделены пробелами или табами
+        const tokens = rest.split(/[\t\s]+/).filter(Boolean);
+        let g = '0', a = '0', pim = '0';
+
+        if (tokens.length >= 4) {
+          // Стандартный порядок столбцов МХЛ: И, Ш (Голы), А (Пасы), О, +/- ... Штр
+          g = tokens[1] || '0';
+          a = tokens[2] || '0';
+          pim = tokens[7] || tokens[6] || '0';
+        } else {
+          // Если цифры слиплись (например: "1000-101000000010.0...")
+          // В структуре МХЛ: 1(И) 0(Ш) 0(А) 0(О) -1(+/-)...
+          const digitMatch = rest.match(/^(\d)(\d)(\d)(\d)/);
+          if (digitMatch) {
+            g = digitMatch[2]; // Шайбы
+            a = digitMatch[3]; // Передачи
+          }
+        }
+
+        parsedPlayers.push({
+          num: playerNum,
+          name: playerName,
+          g: isNaN(parseInt(g)) ? '0' : g,
+          a: isNaN(parseInt(a)) ? '0' : a,
+          plusMinus: plusMinus,
+          pim: isNaN(parseInt(pim)) ? '0' : pim
+        });
+      }
+    }
+
+    // 2. Если парсинг по строкам ничего не дал (слиплось в один блок)
+    if (parsedPlayers.length === 0) {
+      // Ищем все имена
+      let m;
+      const matches = [];
+      while ((m = nameRegex.exec(cleanText)) !== null) {
+        matches.push({ name: m[1], index: m.index });
+      }
+
+      for (let k = 0; k < matches.length; k++) {
+        const cur = matches[k];
+        const nextIndex = (k + 1 < matches.length) ? matches[k + 1].index : cleanText.length;
+        
+        // Номер перед фамилией
+        const beforeText = cleanText.substring(Math.max(0, cur.index - 15), cur.index);
+        const numMatch = beforeText.match(/(\d{1,2})\s*$/);
+        const playerNum = numMatch ? numMatch[1] : '';
+
+        // Текст со статистикой после фамилии
+        const afterText = cleanText.substring(cur.index + cur.name.length, nextIndex);
+        
+        let plusMinus = '0';
+        const pmMatch = afterText.match(/([+-]\d+)/);
+        if (pmMatch) plusMinus = pmMatch[1];
+
+        let g = '0', a = '0', pim = '0';
+        const digits = afterText.match(/^(\d)(\d)(\d)(\d)/);
+        if (digits) {
+          g = digits[2];
+          a = digits[3];
+        }
+
+        parsedPlayers.push({
+          num: playerNum,
+          name: cur.name.trim(),
+          g: g,
+          a: a,
+          plusMinus: plusMinus,
+          pim: pim
+        });
+      }
+    }
+
+    if (parsedPlayers.length === 0) {
+      alert('Не удалось распознать строки. Попробуйте выделить только блок игроков.');
+      return;
+    }
+
+    // Заполняем таблицу игроков в интерфейсе
+    renderPlayersTable(parsedPlayers);
+    closeMhlPasteModal();
+    alert(`Успешно распознано игроков: ${parsedPlayers.length}`);
+  }
 
     const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
     const parsedPlayers = [];
