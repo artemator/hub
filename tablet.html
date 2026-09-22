@@ -947,12 +947,28 @@
     </div>
   </div>
 </div>
-
 <script>
-  localforage.config({
-    name: 'HockeyCoachHub',
-    storeName: 'coach_hub_calendar'
-  });
+  // Безопасная инициализация LocalForage (IndexedDB с фоллбэком на localStorage)
+  (function initStorage() {
+    if (typeof window.localforage === 'undefined') {
+      window.localforage = {
+        config: function() {},
+        getItem: async function(key) {
+          try { return JSON.parse(localStorage.getItem(key)); } catch(e) { return null; }
+        },
+        setItem: async function(key, val) {
+          try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+        }
+      };
+    } else {
+      try {
+        window.localforage.config({
+          name: 'HockeyCoachHub',
+          storeName: 'coach_hub_calendar'
+        });
+      } catch(e) {}
+    }
+  })();
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -996,18 +1012,20 @@
 
   let activeControlLine = null;
   let activeControlHandles = [];
+  let activeGuideLines = [];
   let draggingMidData = null;
 
   let urlDateParam = null;
 
+  // База данных схем (IndexedDB)
   async function getDrills() {
-    let drills = await localforage.getItem('hockey_pro_drills');
+    let drills = await window.localforage.getItem('hockey_pro_drills');
     if (!drills) {
       try {
         const legacy = JSON.parse(localStorage.getItem('hockey_pro_drills') || '[]');
         if (Array.isArray(legacy) && legacy.length > 0) {
           drills = legacy;
-          await localforage.setItem('hockey_pro_drills', drills);
+          await window.localforage.setItem('hockey_pro_drills', drills);
         }
       } catch (e) {}
     }
@@ -1017,17 +1035,18 @@
   }
 
   async function saveDrills(drills) {
-    return await localforage.setItem('hockey_pro_drills', drills);
+    return await window.localforage.setItem('hockey_pro_drills', drills);
   }
 
+  // База данных пользовательских фонов (IndexedDB)
   async function getCustomBgs() {
-    let bgs = await localforage.getItem('hockey_custom_bgs');
+    let bgs = await window.localforage.getItem('hockey_custom_bgs');
     if (!bgs) {
       try {
         const legacy = JSON.parse(localStorage.getItem('hockey_custom_bgs') || '[]');
         if (Array.isArray(legacy) && legacy.length > 0) {
           bgs = legacy;
-          await localforage.setItem('hockey_custom_bgs', bgs);
+          await window.localforage.setItem('hockey_custom_bgs', bgs);
         }
       } catch (e) {}
     }
@@ -1035,7 +1054,7 @@
   }
 
   async function saveCustomBgs(bgs) {
-    return await localforage.setItem('hockey_custom_bgs', bgs);
+    return await window.localforage.setItem('hockey_custom_bgs', bgs);
   }
 
   function setPlayerStampMode(mode) {
@@ -1053,6 +1072,10 @@
     if (activeControlHandles.length > 0) {
       activeControlHandles.forEach(h => canvas.remove(h));
       activeControlHandles = [];
+    }
+    if (activeGuideLines.length > 0) {
+      activeGuideLines.forEach(g => canvas.remove(g));
+      activeGuideLines = [];
     }
     activeControlLine = null;
     canvas.requestRenderAll();
@@ -1111,30 +1134,77 @@
     activeControlLine = groupObj;
     const pts = groupObj.controlPoints;
 
-    pts.forEach((pt, idx) => {
-      const handle = new fabric.Circle({
-        left: pt.x, top: pt.y, radius: 6 * globalObjectScale,
-        fill: '#38bdf8', stroke: '#ffffff', strokeWidth: 2,
-        originX: 'center', originY: 'center', hasControls: false, hasBorders: false,
-        selectable: true, hoverCursor: 'move', isControlHandle: true, pointIndex: idx, isMidpoint: false
+    // Пунктирные направляющие к средним точкам
+    for (let i = 0; i < pts.length - 1; i++) {
+      const midX = (pts[i].x + pts[i + 1].x) / 2;
+      const midY = (pts[i].y + pts[i + 1].y) / 2;
+
+      const guide1 = new fabric.Line([pts[i].x, pts[i].y, midX, midY], {
+        stroke: '#f59e0b', strokeWidth: 1.2, strokeDashArray: [3, 3],
+        selectable: false, evented: false, opacity: 0.75, segIndex: i, isGuide1: true
       });
+      const guide2 = new fabric.Line([midX, midY, pts[i + 1].x, pts[i + 1].y], {
+        stroke: '#f59e0b', strokeWidth: 1.2, strokeDashArray: [3, 3],
+        selectable: false, evented: false, opacity: 0.75, segIndex: i, isGuide2: true
+      });
+
+      activeGuideLines.push(guide1, guide2);
+      canvas.add(guide1, guide2);
+    }
+
+    // Опорные вершины (A - старт, B - финиш, 1..N - промежуточные)
+    pts.forEach((pt, idx) => {
+      let labelText = `${idx}`;
+      let bgColor = '#0284c7';
+
+      if (idx === 0) {
+        labelText = 'A';
+        bgColor = '#16a34a';
+      } else if (idx === pts.length - 1) {
+        labelText = 'B';
+        bgColor = '#dc2626';
+      }
+
+      const r = 8 * globalObjectScale;
+      const bg = new fabric.Circle({
+        radius: r, fill: bgColor, stroke: '#ffffff', strokeWidth: 1.8, originX: 'center', originY: 'center'
+      });
+      const txt = new fabric.Text(labelText, {
+        fontSize: Math.round(9 * globalObjectScale), fill: '#ffffff', fontWeight: 'bold', originX: 'center', originY: 'center', fontFamily: 'sans-serif'
+      });
+
+      const handle = new fabric.Group([bg, txt], {
+        left: pt.x, top: pt.y, originX: 'center', originY: 'center',
+        hasControls: false, hasBorders: false, selectable: true, hoverCursor: 'move',
+        isControlHandle: true, pointIndex: idx, isMidpoint: false
+      });
+
       activeControlHandles.push(handle);
       canvas.add(handle);
       handle.bringToFront();
     });
 
+    // Средние точки с плюсом для выгибания дуги
     for (let i = 0; i < pts.length - 1; i++) {
       const midX = (pts[i].x + pts[i + 1].x) / 2;
       const midY = (pts[i].y + pts[i + 1].y) / 2;
+      const r = 6 * globalObjectScale;
 
-      const midHandle = new fabric.Circle({
-        left: midX, top: midY, radius: 5 * globalObjectScale,
-        fill: '#facc15', stroke: '#ffffff', strokeWidth: 1.5,
-        originX: 'center', originY: 'center', hasControls: false, hasBorders: false,
-        selectable: true, hoverCursor: 'pointer', isControlHandle: true, segIndex: i, isMidpoint: true
+      const bg = new fabric.Circle({
+        radius: r, fill: '#f59e0b', stroke: '#ffffff', strokeWidth: 1.5, originX: 'center', originY: 'center'
+      });
+      const txt = new fabric.Text('+', {
+        fontSize: Math.round(11 * globalObjectScale), fill: '#ffffff', fontWeight: '900', originX: 'center', originY: 'center', top: -1
+      });
+
+      const midHandle = new fabric.Group([bg, txt], {
+        left: midX, top: midY, originX: 'center', originY: 'center',
+        hasControls: false, hasBorders: false, selectable: true, hoverCursor: 'pointer',
+        isControlHandle: true, segIndex: i, isMidpoint: true
       });
       midHandle.origMidX = midX;
       midHandle.origMidY = midY;
+
       activeControlHandles.push(midHandle);
       canvas.add(midHandle);
       midHandle.bringToFront();
@@ -1336,7 +1406,6 @@
     setupModalOverlayCloseEvents();
     setTimeout(resizeCanvasToFit, 50);
 
-    // Чтение параметров URL из Календаря
     const params = new URLSearchParams(window.location.search);
     if (params.get('date')) {
       urlDateParam = params.get('date');
@@ -1398,6 +1467,7 @@
   const RINK_WIDTH_PX = 26 * RINK_M_TO_PX;
   const RINK_CORNER_RADIUS_PX = 8.5 * RINK_M_TO_PX;
 
+  // Регламентная форма вратарской площади с усами и дугой
   function createOfficialGoalCrease(x, cy, facingRight = true) {
     const m = RINK_M_TO_PX;
     const halfBase = 1.22 * m;
@@ -1417,17 +1487,6 @@
     })];
   }
 
-  function drawFullIce() {
-    currentRinkType = 'full';
-    currentVirtualWidth = VIRTUAL_WIDTH_FULL;
-    canvas.clear();
-    drawFullIceWithoutReset();
-    if (tracingObject) canvas.add(tracingObject);
-    lockBackgroundObjects();
-    resizeCanvasToFit();
-    saveState();
-  }
-
   function drawFaceoffCircle(cx, cy, color) {
     const r = 4.5 * RINK_M_TO_PX;
     const circle = new fabric.Circle({ left: cx, top: cy, originX: 'center', originY: 'center', radius: r, fill: 'transparent', stroke: color, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
@@ -1441,6 +1500,79 @@
     canvas.add(circle, dot, h1, h2, h3, h4);
   }
 
+  function drawFullIce() {
+    currentRinkType = 'full';
+    currentVirtualWidth = VIRTUAL_WIDTH_FULL;
+    canvas.clear();
+    drawFullIceWithoutReset();
+    if (tracingObject) canvas.add(tracingObject);
+    lockBackgroundObjects();
+    resizeCanvasToFit();
+    saveState();
+  }
+
+  function drawFullIceWithoutReset() {
+    const m = RINK_M_TO_PX, leftX = RINK_LEFT_OFFSET, rightX = leftX + RINK_LENGTH_PX;
+    const topY = RINK_TOP_OFFSET, bottomY = topY + RINK_WIDTH_PX, centerY = (topY + bottomY) / 2, centerX = leftX + RINK_LENGTH_PX / 2;
+    const red = '#dc2626', blue = '#2563eb';
+
+    const base = new fabric.Rect({ left: 0, top: 0, width: VIRTUAL_WIDTH_FULL, height: VIRTUAL_HEIGHT, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
+    const boards = new fabric.Rect({ left: leftX, top: topY, width: RINK_LENGTH_PX, height: RINK_WIDTH_PX, fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, rx: RINK_CORNER_RADIUS_PX, ry: RINK_CORNER_RADIUS_PX, selectable: false, evented: false, name: 'rink_bg' });
+    canvas.add(base, boards);
+
+    // Точный срез линии ворот по дуге скругления (не вылетает за борт)
+    const goalLineDist = 3.35 * m;
+    const dxCorner = RINK_CORNER_RADIUS_PX - goalLineDist;
+    const chordOffset = RINK_CORNER_RADIUS_PX - Math.sqrt(Math.max(0, (RINK_CORNER_RADIUS_PX * RINK_CORNER_RADIUS_PX) - (dxCorner * dxCorner)));
+    const goalLineTopY = topY + chordOffset + 2;
+    const goalLineBottomY = bottomY - chordOffset - 2;
+
+    const goalLineLX = leftX + goalLineDist, goalLineRX = rightX - goalLineDist;
+    const goalLineL = new fabric.Line([goalLineLX, goalLineTopY, goalLineLX, goalLineBottomY], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
+    const goalLineR = new fabric.Line([goalLineRX, goalLineTopY, goalLineRX, goalLineBottomY], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
+
+    const blueLineLX = leftX + 22.86 * m, blueLineRX = rightX - 22.86 * m;
+    const blueL = new fabric.Line([blueLineLX, topY, blueLineLX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+    const blueR = new fabric.Line([blueLineRX, topY, blueLineRX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+    const centerRed = new fabric.Line([centerX, topY, centerX, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+
+    const centerCircle = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 4.5 * m, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const centerDot = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 0.3 * m, fill: blue, selectable: false, evented: false, name: 'rink_bg' });
+
+    // Трапеции за воротами
+    const trapGoalHalfW = 3.35 * m;
+    const trapBoardHalfW = 4.265 * m;
+    const trapL_Top = new fabric.Line([goalLineLX, centerY - trapGoalHalfW, leftX, centerY - trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const trapL_Bottom = new fabric.Line([goalLineLX, centerY + trapGoalHalfW, leftX, centerY + trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const trapR_Top = new fabric.Line([goalLineRX, centerY - trapGoalHalfW, rightX, centerY - trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const trapR_Bottom = new fabric.Line([goalLineRX, centerY + trapGoalHalfW, rightX, centerY + trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    canvas.add(
+      goalLineL, goalLineR, blueL, blueR, centerRed, centerCircle, centerDot,
+      trapL_Top, trapL_Bottom, trapR_Top, trapR_Bottom,
+      ...createOfficialGoalCrease(goalLineLX, centerY, true),
+      ...createOfficialGoalCrease(goalLineRX, centerY, false)
+    );
+
+    drawFaceoffCircle(goalLineLX + 6.1 * m, centerY - 6.7 * m, red);
+    drawFaceoffCircle(goalLineLX + 6.1 * m, centerY + 6.7 * m, red);
+    drawFaceoffCircle(goalLineRX - 6.1 * m, centerY - 6.7 * m, red);
+    drawFaceoffCircle(goalLineRX - 6.1 * m, centerY + 6.7 * m, red);
+
+    // Точки нейтральной зоны
+    const neutralDistX = 1.5 * m;
+    [
+      { x: blueLineLX + neutralDistX, y: centerY - 6.7 * m },
+      { x: blueLineLX + neutralDistX, y: centerY + 6.7 * m },
+      { x: blueLineRX - neutralDistX, y: centerY - 6.7 * m },
+      { x: blueLineRX - neutralDistX, y: centerY + 6.7 * m }
+    ].forEach(pt => {
+      canvas.add(new fabric.Circle({ left: pt.x, top: pt.y, originX: 'center', originY: 'center', radius: 0.3 * m, fill: red, selectable: false, evented: false, name: 'rink_bg' }));
+    });
+
+    lockBackgroundObjects();
+  }
+
   function drawHalfIce() {
     currentRinkType = 'half';
     currentVirtualWidth = VIRTUAL_WIDTH_HALF;
@@ -1450,6 +1582,31 @@
     lockBackgroundObjects();
     resizeCanvasToFit();
     saveState();
+  }
+
+  function drawHalfIceWithoutReset() {
+    const m = RINK_M_TO_PX, leftX = 20, rightX = VIRTUAL_WIDTH_HALF, topY = RINK_TOP_OFFSET, bottomY = topY + RINK_WIDTH_PX, centerY = (topY + bottomY) / 2;
+    const red = '#dc2626', blue = '#2563eb';
+
+    const base = new fabric.Rect({ left: 0, top: 0, width: VIRTUAL_WIDTH_HALF, height: VIRTUAL_HEIGHT, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
+    const boardsHalf = new fabric.Path(`M ${rightX} ${topY} L ${leftX + RINK_CORNER_RADIUS_PX} ${topY} A ${RINK_CORNER_RADIUS_PX} ${RINK_CORNER_RADIUS_PX} 0 0 0 ${leftX} ${topY + RINK_CORNER_RADIUS_PX} L ${leftX} ${bottomY - RINK_CORNER_RADIUS_PX} A ${RINK_CORNER_RADIUS_PX} ${RINK_CORNER_RADIUS_PX} 0 0 0 ${leftX + RINK_CORNER_RADIUS_PX} ${bottomY} L ${rightX} ${bottomY} Z`, { fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, selectable: false, evented: false, name: 'rink_bg' });
+    const centerRed = new fabric.Line([rightX - 2, topY, rightX - 2, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+    const blueLine = new fabric.Line([rightX - 7.14 * m, topY, rightX - 7.14 * m, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+
+    const goalLineDist = 3.35 * m;
+    const dxCorner = RINK_CORNER_RADIUS_PX - goalLineDist;
+    const chordOffset = RINK_CORNER_RADIUS_PX - Math.sqrt(Math.max(0, (RINK_CORNER_RADIUS_PX * RINK_CORNER_RADIUS_PX) - (dxCorner * dxCorner)));
+    const goalLine = new fabric.Line([leftX + goalLineDist, topY + chordOffset + 2, leftX + goalLineDist, bottomY - chordOffset - 2], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
+
+    const trapGoalHalfW = 3.35 * m;
+    const trapBoardHalfW = 4.265 * m;
+    const trap1 = new fabric.Line([leftX + goalLineDist, centerY - trapGoalHalfW, leftX, centerY - trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+    const trap2 = new fabric.Line([leftX + goalLineDist, centerY + trapGoalHalfW, leftX, centerY + trapBoardHalfW], { stroke: red, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    canvas.add(base, boardsHalf, centerRed, blueLine, goalLine, trap1, trap2, ...createOfficialGoalCrease(leftX + goalLineDist, centerY, true));
+    drawFaceoffCircle(leftX + goalLineDist + 6.1 * m, centerY - 6.7 * m, red);
+    drawFaceoffCircle(leftX + goalLineDist + 6.1 * m, centerY + 6.7 * m, red);
+    lockBackgroundObjects();
   }
 
   function drawNeutralZoneIce() {
@@ -1463,12 +1620,29 @@
     saveState();
   }
 
+  function drawNeutralZoneWithoutReset() {
+    const m = RINK_M_TO_PX, leftX = 20, rightX = VIRTUAL_WIDTH_HALF - 20, topY = RINK_TOP_OFFSET, bottomY = topY + RINK_WIDTH_PX, centerY = (topY + bottomY) / 2, centerX = (leftX + rightX) / 2;
+    const red = '#dc2626', blue = '#2563eb';
+
+    const base = new fabric.Rect({ left: 0, top: 0, width: VIRTUAL_WIDTH_HALF, height: VIRTUAL_HEIGHT, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
+    const boards = new fabric.Rect({ left: leftX, top: topY, width: rightX - leftX, height: RINK_WIDTH_PX, fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, selectable: false, evented: false, name: 'rink_bg' });
+    const bL = new fabric.Line([leftX, topY, leftX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+    const bR = new fabric.Line([rightX, topY, rightX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+    const cR = new fabric.Line([centerX, topY, centerX, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
+    const circle = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 4.5 * m, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
+
+    canvas.add(base, boards, bL, bR, cR, circle);
+    lockBackgroundObjects();
+  }
+
   function setRinkPreset(type) {
     document.getElementById('btnFullRink').classList.toggle('active', type === 'full');
     document.getElementById('btnHalfRink').classList.toggle('active', type === 'half');
     document.getElementById('btnNeutralZone').classList.toggle('active', type === 'neutral_zone');
+
     const select = document.getElementById('customBgSelect');
     if (select) select.value = '';
+
     if (type === 'full') drawFullIce();
     else if (type === 'half') drawHalfIce();
     else if (type === 'neutral_zone') drawNeutralZoneIce();
@@ -1478,6 +1652,7 @@
     const select = document.getElementById('customBgSelect');
     if (!select) return;
     const bgs = await getCustomBgs();
+
     select.innerHTML = '<option value="">-- Выберите свой фон --</option>';
     bgs.forEach(bg => {
       const opt = document.createElement('option');
@@ -1498,9 +1673,11 @@
       canvas.add(img);
       if (tracingObject) canvas.add(tracingObject);
       currentRinkType = isHalf ? 'half' : 'full';
+
       document.getElementById('btnFullRink').classList.toggle('active', !isHalf);
       document.getElementById('btnHalfRink').classList.toggle('active', isHalf);
       document.getElementById('btnNeutralZone').classList.remove('active');
+
       lockBackgroundObjects();
       resizeCanvasToFit();
       saveState();
@@ -1523,6 +1700,7 @@
     let bgs = await getCustomBgs();
     const target = bgs.find(b => b.id == id);
     if (!confirm(`Удалить фон «${target ? target.name : ''}»?`)) return;
+
     bgs = bgs.filter(b => b.id != id);
     await saveCustomBgs(bgs);
     await renderCustomBgsSelect();
@@ -1542,6 +1720,7 @@
         const defaultName = file.name.replace(/\.[^/.]+$/, '') || `Фон ${existingBgs.length + 1}`;
         const bgName = prompt('Название фона:', defaultName);
         if (!bgName) { e.target.value = ''; return; }
+
         const newBg = { id: Date.now(), name: bgName.trim(), data: dataUrl, isHalf: isHalf };
         existingBgs.push(newBg);
         await saveCustomBgs(existingBgs);
@@ -1696,6 +1875,25 @@
     } else if (type === 'puck') {
       const puck = new fabric.Circle({ left: pointer.x, top: pointer.y, originX: 'center', originY: 'center', radius: 7, fill: '#000000', stroke: '#ffffff', strokeWidth: 1.5, scaleX: globalObjectScale, scaleY: globalObjectScale, customType: 'equipment' });
       canvas.add(puck);
+    } else if (type === 'pucks_cluster') {
+      // 5 маленьких шайб единым цельным объектом (группой)
+      const r = 5.5;
+      const offsets = [
+        { x: 0, y: -7 },
+        { x: -8, y: 3 },
+        { x: 8, y: 3 },
+        { x: -4, y: 11 },
+        { x: 4, y: 11 }
+      ];
+      const circles = offsets.map(pos => new fabric.Circle({
+        left: pos.x, top: pos.y, originX: 'center', originY: 'center',
+        radius: r, fill: '#000000', stroke: '#ffffff', strokeWidth: 1.2
+      }));
+      const pucksGroup = new fabric.Group(circles, {
+        left: pointer.x, top: pointer.y, originX: 'center', originY: 'center',
+        scaleX: globalObjectScale, scaleY: globalObjectScale, customType: 'equipment', name: 'pucks_cluster'
+      });
+      canvas.add(pucksGroup);
     } else if (type === 'cone') {
       const cone = new fabric.Triangle({ left: pointer.x, top: pointer.y, originX: 'center', originY: 'center', width: 18, height: 20, fill: '#ea580c', stroke: '#ffffff', strokeWidth: 1.5, scaleX: globalObjectScale, scaleY: globalObjectScale, customType: 'equipment' });
       canvas.add(cone);
@@ -1929,14 +2127,22 @@
     canvas.on('object:moving', (e) => {
       const target = e.target;
       if (!target) return;
+
+      // Перемещение всей линии целиком: точки и направляющие следуют за ней
       if (target.controlPoints && target === activeControlLine) {
         const dx = target.left - target.lastLeft, dy = target.top - target.lastTop;
         target.lastLeft = target.left; target.lastTop = target.top;
         target.controlPoints.forEach(pt => { pt.x += dx; pt.y += dy; });
         activeControlHandles.forEach(h => { h.left += dx; h.top += dy; h.setCoords(); });
+        activeGuideLines.forEach(g => {
+          g.set({ x1: g.x1 + dx, y1: g.y1 + dy, x2: g.x2 + dx, y2: g.y2 + dy });
+          g.setCoords();
+        });
         canvas.requestRenderAll();
         return;
       }
+
+      // Перемещение ручек контрольных точек
       if (target.isControlHandle && activeControlLine) {
         const pointer = { x: target.left, y: target.top };
         if (target.isMidpoint) {
@@ -2002,7 +2208,7 @@
       const target = opt.target;
       if (target && target.customType === 'player') {
         const textObj = target.item(1);
-        const newTxt = prompt('Введите подпись игрока:', textObj ? textObj.text : '');
+        const newTxt = prompt('Введите роль / подпись игрока:', textObj ? textObj.text : '');
         if (newTxt !== null && newTxt.trim() !== '') {
           target.isStampMode = false;
           textObj.set({ text: newTxt.trim(), fontSize: newTxt.trim().length > 2 ? 10 : 13 });
@@ -2456,67 +2662,6 @@
     closeHistoryModal();
   }
 
-  function drawFullIceWithoutReset() {
-    const m = RINK_M_TO_PX, leftX = RINK_LEFT_OFFSET, rightX = leftX + RINK_LENGTH_PX;
-    const topY = RINK_TOP_OFFSET, bottomY = topY + RINK_WIDTH_PX, centerY = (topY + bottomY) / 2, centerX = leftX + RINK_LENGTH_PX / 2;
-    const red = '#dc2626', blue = '#2563eb';
-
-    const base = new fabric.Rect({ left: 0, top: 0, width: VIRTUAL_WIDTH_FULL, height: VIRTUAL_HEIGHT, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
-    const boards = new fabric.Rect({ left: leftX, top: topY, width: RINK_LENGTH_PX, height: RINK_WIDTH_PX, fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, rx: RINK_CORNER_RADIUS_PX, ry: RINK_CORNER_RADIUS_PX, selectable: false, evented: false, name: 'rink_bg' });
-    canvas.add(base, boards);
-
-    const goalLineDist = 3.35 * m;
-    const goalLineLX = leftX + goalLineDist, goalLineRX = rightX - goalLineDist;
-    const goalLineL = new fabric.Line([goalLineLX, topY + 20, goalLineLX, bottomY - 20], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
-    const goalLineR = new fabric.Line([goalLineRX, topY + 20, goalLineRX, bottomY - 20], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
-
-    const blueLineLX = leftX + 22.86 * m, blueLineRX = rightX - 22.86 * m;
-    const blueL = new fabric.Line([blueLineLX, topY, blueLineLX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-    const blueR = new fabric.Line([blueLineRX, topY, blueLineRX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-    const centerRed = new fabric.Line([centerX, topY, centerX, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-
-    const centerCircle = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 4.5 * m, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-    const centerDot = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 0.3 * m, fill: blue, selectable: false, evented: false, name: 'rink_bg' });
-
-    canvas.add(goalLineL, goalLineR, blueL, blueR, centerRed, centerCircle, centerDot, ...createOfficialGoalCrease(goalLineLX, centerY, true), ...createOfficialGoalCrease(goalLineRX, centerY, false));
-    drawFaceoffCircle(goalLineLX + 6.1 * m, centerY - 6.7 * m, red);
-    drawFaceoffCircle(goalLineLX + 6.1 * m, centerY + 6.7 * m, red);
-    drawFaceoffCircle(goalLineRX - 6.1 * m, centerY - 6.7 * m, red);
-    drawFaceoffCircle(goalLineRX - 6.1 * m, centerY + 6.7 * m, red);
-    lockBackgroundObjects();
-  }
-
-  function drawHalfIceWithoutReset() {
-    const m = RINK_M_TO_PX, leftX = 20, rightX = VIRTUAL_WIDTH_HALF, topY = RINK_TOP_OFFSET, bottomY = topY + RINK_WIDTH_PX, centerY = (topY + bottomY) / 2;
-    const red = '#dc2626', blue = '#2563eb';
-
-    const base = new fabric.Rect({ left: 0, top: 0, width: VIRTUAL_WIDTH_HALF, height: VIRTUAL_HEIGHT, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
-    const boardsHalf = new fabric.Path(`M ${rightX} ${topY} L ${leftX + RINK_CORNER_RADIUS_PX} ${topY} A ${RINK_CORNER_RADIUS_PX} ${RINK_CORNER_RADIUS_PX} 0 0 0 ${leftX} ${topY + RINK_CORNER_RADIUS_PX} L ${leftX} ${bottomY - RINK_CORNER_RADIUS_PX} A ${RINK_CORNER_RADIUS_PX} ${RINK_CORNER_RADIUS_PX} 0 0 0 ${leftX + RINK_CORNER_RADIUS_PX} ${bottomY} L ${rightX} ${bottomY} Z`, { fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, selectable: false, evented: false, name: 'rink_bg' });
-    const centerRed = new fabric.Line([rightX - 2, topY, rightX - 2, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-    const blueLine = new fabric.Line([rightX - 7.14 * m, topY, rightX - 7.14 * m, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-    const goalLine = new fabric.Line([leftX + 3.35 * m, topY + 20, leftX + 3.35 * m, bottomY - 20], { stroke: red, strokeWidth: 2.5, selectable: false, evented: false, name: 'rink_bg' });
-
-    canvas.add(base, boardsHalf, centerRed, blueLine, goalLine, ...createOfficialGoalCrease(leftX + 3.35 * m, centerY, true));
-    drawFaceoffCircle(leftX + 3.35 * m + 6.1 * m, centerY - 6.7 * m, red);
-    drawFaceoffCircle(leftX + 3.35 * m + 6.1 * m, centerY + 6.7 * m, red);
-    lockBackgroundObjects();
-  }
-
-  function drawNeutralZoneWithoutReset() {
-    const m = RINK_M_TO_PX, leftX = 20, rightX = VIRTUAL_WIDTH_HALF - 20, topY = RINK_TOP_OFFSET, bottomY = topY + RINK_WIDTH_PX, centerY = (topY + bottomY) / 2, centerX = (leftX + rightX) / 2;
-    const red = '#dc2626', blue = '#2563eb';
-
-    const base = new fabric.Rect({ left: 0, top: 0, width: VIRTUAL_WIDTH_HALF, height: VIRTUAL_HEIGHT, fill: '#f8fafc', selectable: false, evented: false, name: 'rink_bg' });
-    const boards = new fabric.Rect({ left: leftX, top: topY, width: rightX - leftX, height: RINK_WIDTH_PX, fill: '#ffffff', stroke: '#0284c7', strokeWidth: 4, selectable: false, evented: false, name: 'rink_bg' });
-    const bL = new fabric.Line([leftX, topY, leftX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-    const bR = new fabric.Line([rightX, topY, rightX, bottomY], { stroke: blue, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-    const cR = new fabric.Line([centerX, topY, centerX, bottomY], { stroke: red, strokeWidth: 0.3 * m, selectable: false, evented: false, name: 'rink_bg' });
-    const circle = new fabric.Circle({ left: centerX, top: centerY, originX: 'center', originY: 'center', radius: 4.5 * m, fill: 'transparent', stroke: blue, strokeWidth: 2, selectable: false, evented: false, name: 'rink_bg' });
-
-    canvas.add(base, boards, bL, bR, cR, circle);
-    lockBackgroundObjects();
-  }
-
   function openWorkoutBuilderModal() {
     selectedWorkoutDrills = [];
     updateSelectedCount();
@@ -2647,7 +2792,6 @@
     return bytes;
   }
 
-  /* СБОРКА И АВТОМАТИЧЕСКОЕ СОХРАНЕНИЕ DOCX ДЛЯ ХАБА */
   async function generateWordDocument() {
     if (selectedWorkoutDrills.length === 0) {
       alert('Выберите хотя бы одно упражнение!');
@@ -2716,11 +2860,10 @@
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `${title}.docx`);
 
-      // Автоматическое сохранение в базу Hub'а для выбора в календаре
       const reader = new FileReader();
       reader.onload = async () => {
         const base64Docx = reader.result.split(',')[1];
-        const workouts = await localforage.getItem('hockey_generated_workouts') || [];
+        const workouts = await window.localforage.getItem('hockey_generated_workouts') || [];
         const workoutId = `wo_${Date.now()}`;
         workouts.push({
           id: workoutId,
@@ -2731,11 +2874,10 @@
           createdAt: new Date().toLocaleDateString('ru-RU'),
           base64: base64Docx
         });
-        await localforage.setItem('hockey_generated_workouts', workouts);
+        await window.localforage.setItem('hockey_generated_workouts', workouts);
 
-        // Если дата была передана из календаря — прикрепляем к этому дню
         if (urlDateParam) {
-          const hubDays = await localforage.getItem('hockey_hub_days') || {};
+          const hubDays = await window.localforage.getItem('hockey_hub_days') || {};
           if (!hubDays[urlDateParam]) hubDays[urlDateParam] = {};
           hubDays[urlDateParam].training = {
             title: title,
@@ -2744,7 +2886,7 @@
             attachedDocxId: workoutId,
             attachedDocxName: `${title}.docx`
           };
-          await localforage.setItem('hockey_hub_days', hubDays);
+          await window.localforage.setItem('hockey_hub_days', hubDays);
         }
 
         alert(`Конспект «${title}.docx» сохранен и доступен в Календаре!`);
