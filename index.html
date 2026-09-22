@@ -624,7 +624,6 @@
     </div>
   </div>
 </div>
-
 <script>
   // Безопасный fallback: если библиотека CDN заблокирована или недоступна, работаем через localStorage
   (function initStorage() {
@@ -653,6 +652,8 @@
   let activeSelectedDateKey = null;
 
   let hubDaysData = {};
+  let activeDayMatches = [];
+  let currentActiveMatchIndex = 0;
 
   const monthNames = [
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -729,10 +730,14 @@
         if (data.training && data.training.title) {
           badgesHtml += `<div class="event-badge badge-training" title="Тренировка: ${data.training.title}"><i class="ph-bold ph-clipboard"></i> <span>${data.training.title}</span></div>`;
         }
-        if (data.match && data.match.opponent) {
-          const scoreStr = data.match.score ? ` (${data.match.score})` : '';
-          badgesHtml += `<div class="event-badge badge-match" title="Матч: против ${data.match.opponent}"><i class="ph-bold ph-trophy"></i> <span>${data.match.opponent}${scoreStr}</span></div>`;
-        }
+        const matchesArr = data.matches || (data.match ? [{ ...data.match, players: data.players || [] }] : []);
+        matchesArr.forEach((m, mIdx) => {
+          if (m && m.opponent) {
+            const scoreStr = m.score ? ` (${m.score})` : '';
+            const matchPrefix = matchesArr.length > 1 ? `И${mIdx + 1}: ` : '';
+            badgesHtml += `<div class="event-badge badge-match" title="Матч: против ${m.opponent}"><i class="ph-bold ph-trophy"></i> <span>${matchPrefix}${m.opponent}${scoreStr}</span></div>`;
+          }
+        });
       }
 
       cell.innerHTML = `
@@ -766,14 +771,99 @@
       attachedStatus.textContent = 'Конспект не выбран';
     }
 
-    document.getElementById('matchOpponent').value = data.match?.opponent || '';
-    document.getElementById('matchScore').value = data.match?.score || '';
-    document.getElementById('matchType').value = data.match?.type || 'official';
+    // Инициализация массива матчей дня (до 2 матчей)
+    activeDayMatches = [];
+    if (data.matches && data.matches.length > 0) {
+      activeDayMatches = JSON.parse(JSON.stringify(data.matches));
+    } else if (data.match && (data.match.opponent || data.match.score || (data.players && data.players.length > 0))) {
+      activeDayMatches = [{
+        opponent: data.match.opponent || '',
+        score: data.match.score || '',
+        type: data.match.type || 'official',
+        players: data.players || []
+      }];
+    } else {
+      activeDayMatches = [{ opponent: '', score: '', type: 'official', players: [] }];
+    }
+    currentActiveMatchIndex = 0;
 
-    renderPlayersTable(data.players || []);
-    renderDayHighlights(data.players || []);
+    renderMatchSubTabs();
+    loadMatchFormByIndex(0);
+
     switchDayTab('training');
     document.getElementById('dayHubModal').style.display = 'flex';
+  }
+
+  function renderMatchSubTabs() {
+    const container = document.getElementById('matchSubTabsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    activeDayMatches.forEach((m, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `tab-btn ${idx === currentActiveMatchIndex ? 'active' : ''}`;
+      btn.textContent = `Матч ${idx + 1}`;
+      btn.onclick = () => switchActiveMatchIndex(idx);
+      container.appendChild(btn);
+    });
+    const addBtn = document.getElementById('btnAddSecondMatchBtn');
+    if (addBtn) addBtn.style.display = activeDayMatches.length >= 2 ? 'none' : 'inline-flex';
+  }
+
+  function saveCurrentMatchForm() {
+    if (!activeDayMatches[currentActiveMatchIndex]) return;
+    const opp = document.getElementById('matchOpponent').value.trim();
+    const score = document.getElementById('matchScore').value.trim();
+    const type = document.getElementById('matchType').value;
+
+    const players = [];
+    document.querySelectorAll('#playersTableBody tr').forEach(row => {
+      const num = row.querySelector('.p-num')?.value.trim();
+      const name = row.querySelector('.p-name')?.value.trim();
+      if (num || name) {
+        let rawMhl = null;
+        try { if (row.dataset.rawMhl) rawMhl = JSON.parse(row.dataset.rawMhl); } catch (e) {}
+        const g = row.querySelector('.p-g')?.value || '0';
+        const a = row.querySelector('.p-a')?.value || '0';
+        players.push({
+          num, name, g, a,
+          pts: String((parseInt(g) || 0) + (parseInt(a) || 0)),
+          plusMinus: row.querySelector('.p-pm')?.value || '0',
+          pim: row.querySelector('.p-pim')?.value || '0',
+          toi: row.dataset.toi || '00:00',
+          toiSeconds: parseInt(row.dataset.toiSeconds) || 0,
+          isGoalie: row.dataset.isGoalie === '1' || name.includes('(Вр)'),
+          rawMhl
+        });
+      }
+    });
+
+    activeDayMatches[currentActiveMatchIndex] = { opponent: opp, score, type, players };
+  }
+
+  function loadMatchFormByIndex(idx) {
+    currentActiveMatchIndex = idx;
+    const m = activeDayMatches[idx] || { opponent: '', score: '', type: 'official', players: [] };
+    document.getElementById('matchOpponent').value = m.opponent || '';
+    document.getElementById('matchScore').value = m.score || '';
+    document.getElementById('matchType').value = m.type || 'official';
+
+    renderPlayersTable(m.players || []);
+    renderDayHighlights(m.players || []);
+    renderMatchSubTabs();
+  }
+
+  function switchActiveMatchIndex(newIdx) {
+    saveCurrentMatchForm();
+    loadMatchFormByIndex(newIdx);
+  }
+
+  function addNewMatchToDay() {
+    saveCurrentMatchForm();
+    if (activeDayMatches.length < 2) {
+      activeDayMatches.push({ opponent: '', score: '', type: 'official', players: [] });
+      switchActiveMatchIndex(1);
+    }
   }
 
   function closeDayModal() {
@@ -790,7 +880,7 @@
   function renderPlayersTable(players) {
     const tbody = document.getElementById('playersTableBody');
     tbody.innerHTML = '';
-    if (players.length === 0) {
+    if (!players || players.length === 0) {
       addPlayerRow();
       return;
     }
@@ -834,13 +924,13 @@
 
     let html = '';
 
-    // 1. Основной вратарь, проведший больше всего времени на льду
+    // 1. Основной вратарь по максимуму минут на льду
     if (goalies.length > 0) {
       const bestGoalie = [...goalies].sort((a, b) => (b.toiSeconds || 0) - (a.toiSeconds || 0))[0];
       html += `<div>🏒 <b>Основной вратарь:</b> #${bestGoalie.num || '—'} ${bestGoalie.name} (ВП: ${bestGoalie.toi || '—'}, Штр: ${bestGoalie.pim || 0})</div>`;
     }
 
-    // 2. Полевые: все кто набрал очки (>0), либо топ-5 по времени на льду
+    // 2. Полевые: набравшие очки (>0), либо топ-5 по игровому времени
     const scorers = skaters.filter(p => {
       const pts = (parseInt(p.pts) || (parseInt(p.g) || 0) + (parseInt(p.a) || 0));
       return pts > 0;
@@ -884,50 +974,20 @@
   async function saveDayData() {
     if (!activeSelectedDateKey) return;
 
+    saveCurrentMatchForm();
+
     const existing = hubDaysData[activeSelectedDateKey] || {};
     const trainTitle = document.getElementById('trainTitle').value.trim();
     const trainTime = document.getElementById('trainTime').value.trim();
     const trainDuration = document.getElementById('trainDuration').value.trim();
     const trainGoals = document.getElementById('trainGoals').value.trim();
 
-    const matchOpponent = document.getElementById('matchOpponent').value.trim();
-    const matchScore = document.getElementById('matchScore').value.trim();
-    const matchType = document.getElementById('matchType').value;
-
-    const players = [];
-    document.querySelectorAll('#playersTableBody tr').forEach(row => {
-      const num = row.querySelector('.p-num').value.trim();
-      const name = row.querySelector('.p-name').value.trim();
-      if (num || name) {
-        let rawMhl = null;
-        try {
-          if (row.dataset.rawMhl) rawMhl = JSON.parse(row.dataset.rawMhl);
-        } catch (e) {}
-
-        const g = row.querySelector('.p-g').value;
-        const a = row.querySelector('.p-a').value;
-        const ptsCalc = (parseInt(g) || 0) + (parseInt(a) || 0);
-
-        players.push({
-          num,
-          name,
-          g,
-          a,
-          pts: String(ptsCalc),
-          plusMinus: row.querySelector('.p-pm').value,
-          pim: row.querySelector('.p-pim').value,
-          toi: row.dataset.toi || '00:00',
-          toiSeconds: parseInt(row.dataset.toiSeconds) || 0,
-          isGoalie: row.dataset.isGoalie === '1' || name.includes('(Вр)'),
-          rawMhl: rawMhl
-        });
-      }
-    });
+    const validMatches = activeDayMatches.filter(m => m.opponent || m.score || (m.players && m.players.length > 0));
 
     const isTrainingEmpty = !trainTitle && !trainTime && !trainDuration && !trainGoals && !existing.training?.attachedDocxId;
-    const isMatchEmpty = !matchOpponent && !matchScore && players.length === 0;
+    const isMatchesEmpty = validMatches.length === 0;
 
-    if (isTrainingEmpty && isMatchEmpty) {
+    if (isTrainingEmpty && isMatchesEmpty) {
       delete hubDaysData[activeSelectedDateKey];
     } else {
       hubDaysData[activeSelectedDateKey] = {
@@ -939,8 +999,9 @@
           attachedDocxId: existing.training?.attachedDocxId || null,
           attachedDocxName: existing.training?.attachedDocxName || null
         },
-        match: isMatchEmpty ? null : { opponent: matchOpponent, score: matchScore, type: matchType },
-        players: players
+        matches: validMatches,
+        match: validMatches[0] ? { opponent: validMatches[0].opponent, score: validMatches[0].score, type: validMatches[0].type } : null,
+        players: validMatches[0] ? validMatches[0].players : []
       };
     }
 
@@ -1208,11 +1269,31 @@
     alert(`Успешно распознано игроков: ${parsedPlayers.length}`);
   }
 
-  function exportHubData() {
-    const blob = new Blob([JSON.stringify(hubDaysData, null, 2)], { type: 'application/json' });
-    saveAs(blob, `hockey_hub_backup_${new Date().toISOString().slice(0,10)}.json`);
+  // ПОЛНЫЙ РЕЗЕРВ ВСЕЙ ЭКОСИСТЕМЫ (Календарь + Планшет + Конспекты + Фоны)
+  async function exportHubData() {
+    try {
+      const drills = await window.localforage.getItem('hockey_pro_drills') || [];
+      const workouts = await window.localforage.getItem('hockey_generated_workouts') || [];
+      const customBgs = await window.localforage.getItem('hockey_custom_bgs') || [];
+
+      const fullBackup = {
+        type: 'full_hockey_hub_backup',
+        version: 2,
+        createdAt: new Date().toISOString(),
+        hubDays: hubDaysData,
+        drills: drills,
+        workouts: workouts,
+        customBgs: customBgs
+      };
+
+      const blob = new Blob([JSON.stringify(fullBackup, null, 2)], { type: 'application/json' });
+      saveAs(blob, `hockey_FULL_backup_${new Date().toISOString().slice(0,10)}.json`);
+    } catch (err) {
+      alert('Ошибка при создании резервной копии: ' + err.message);
+    }
   }
 
+  // УМНЫЙ ИМПОРТ: не стирает базу, добавляет 2-й матч и переименовывает совпадающие схемы
   function importHubData(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -1220,13 +1301,87 @@
     reader.onload = async (ev) => {
       try {
         const imported = JSON.parse(ev.target.result);
-        hubDaysData = { ...hubDaysData, ...imported };
-        await saveToStorage();
-        renderCalendar();
-        alert('База хаба успешно импортирована!');
+
+        if (imported.type === 'full_hockey_hub_backup' || imported.hubDays) {
+          // 1. Умное объединение матчей (если дата совпала — добавляем как второй матч)
+          if (imported.hubDays) {
+            Object.keys(imported.hubDays).forEach(dateKey => {
+              const newDay = imported.hubDays[dateKey];
+              if (!hubDaysData[dateKey]) {
+                hubDaysData[dateKey] = newDay;
+              } else {
+                const currentMatches = hubDaysData[dateKey].matches || (hubDaysData[dateKey].match ? [{ ...hubDaysData[dateKey].match, players: hubDaysData[dateKey].players || [] }] : []);
+                const incomingMatches = newDay.matches || (newDay.match ? [{ ...newDay.match, players: newDay.players || [] }] : []);
+
+                incomingMatches.forEach(incM => {
+                  const isDuplicate = currentMatches.some(cm => cm.opponent === incM.opponent && cm.score === incM.score);
+                  if (!isDuplicate && currentMatches.length < 2) {
+                    currentMatches.push(incM);
+                  }
+                });
+
+                hubDaysData[dateKey].matches = currentMatches;
+                hubDaysData[dateKey].match = currentMatches[0] || null;
+                hubDaysData[dateKey].players = currentMatches[0] ? currentMatches[0].players : [];
+                if (!hubDaysData[dateKey].training && newDay.training) {
+                  hubDaysData[dateKey].training = newDay.training;
+                }
+              }
+            });
+            await saveToStorage();
+          }
+
+          // 2. Умное добавление схем: если имя уже есть — дописываем (вариант N+1)
+          if (Array.isArray(imported.drills)) {
+            const existingDrills = await window.localforage.getItem('hockey_pro_drills') || [];
+            const titlesMap = new Set(existingDrills.map(d => d.title.trim().toLowerCase()));
+
+            imported.drills.forEach(d => {
+              const baseTitle = d.title.trim();
+              let finalTitle = baseTitle;
+              let variantNum = 2;
+
+              if (titlesMap.has(finalTitle.toLowerCase())) {
+                while (titlesMap.has(`${baseTitle} (вариант ${variantNum})`.toLowerCase())) {
+                  variantNum++;
+                }
+                finalTitle = `${baseTitle} (вариант ${variantNum})`;
+              }
+
+              titlesMap.add(finalTitle.toLowerCase());
+              existingDrills.push({
+                ...d,
+                id: Date.now() + Math.floor(Math.random() * 100000),
+                title: finalTitle
+              });
+            });
+
+            await window.localforage.setItem('hockey_pro_drills', existingDrills);
+          }
+
+          if (Array.isArray(imported.workouts)) {
+            const existingWo = await window.localforage.getItem('hockey_generated_workouts') || [];
+            const mergedWo = [...existingWo, ...imported.workouts.filter(w => !existingWo.some(ew => ew.id === w.id))];
+            await window.localforage.setItem('hockey_generated_workouts', mergedWo);
+          }
+          if (Array.isArray(imported.customBgs)) {
+            const existingBgs = await window.localforage.getItem('hockey_custom_bgs') || [];
+            const mergedBgs = [...existingBgs, ...imported.customBgs.filter(b => !existingBgs.some(eb => eb.id === b.id))];
+            await window.localforage.setItem('hockey_custom_bgs', mergedBgs);
+          }
+          renderCalendar();
+          alert('Полная база (календарь, схемы планшета, конспекты и фоны) успешно восстановлена!');
+        } else {
+          // Поддержка старых копий только календаря
+          hubDaysData = { ...hubDaysData, ...imported };
+          await saveToStorage();
+          renderCalendar();
+          alert('База календаря успешно импортирована!');
+        }
       } catch (err) {
         alert('Ошибка при импорте файла: ' + err.message);
       }
+      e.target.value = '';
     };
     reader.readAsText(file);
   }
